@@ -1,0 +1,11 @@
+# LaTeX auxiliary files (sources live in tex/)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+tex/*.pdf

@@ -1,0 +1,47 @@
+name: Build LaTeX PDF
+
+# Runs when changes land on main (including PR merges). PDF commits do not
+# retrigger this workflow because they do not touch tex/**.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tex/**"
+      - ".github/workflows/latex.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: latex-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: tex/main.tex
+          work_in_root_file_dir: true
+          args: -pdf -file-line-error -halt-on-error -interaction=nonstopmode
+
+      - name: Publish PDF on repository root
+        run: |
+          cp tex/main.pdf main.pdf
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add main.pdf
+          if git diff --staged --quiet; then
+            echo "PDF unchanged; nothing to commit."
+          else
+            git commit -m "chore: update compiled PDF [skip ci]"
+            git push
+          fi
