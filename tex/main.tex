@@ -1,5 +1,11 @@
 \documentclass{article}
-\usepackage[preprint,eandd,nonanonymous,nonatbib]{neurips_2026}
+\usepackage[eandd, nonanonymous, nonatbib]{neurips_2026}
+% Replace the default NeurIPS page-1 notice (course project attribution).
+\makeatletter
+\renewcommand{\@noticestring}{%
+   Project for the Methods of Optimization in Machine Learning course, HSE University.%
+}
+\makeatother
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
