@@ -1,11 +1,5 @@
 \documentclass{article}
-\usepackage[eandd, nonanonymous, nonatbib]{neurips_2026}
-% Replace the default NeurIPS page-1 notice (course project attribution).
-\makeatletter
-\renewcommand{\@noticestring}{%
-  Course project for the Methods of Optimization in Machine Learning course, HSE University.%
-}
-\makeatother
+\usepackage[preprint,eandd,nonanonymous,nonatbib]{neurips_2026}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -21,9 +15,9 @@
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
 \usepackage{fancyhdr}
 \usepackage{float}   % for [H] figure placement
-
 \geometry{top=1cm, bottom=1cm, left=1.65cm, right=1.65cm}
-
+\usepackage[backend=biber,style=numeric,urldate=long,maxbibnames=99]{biblatex}
+\addbibresource{refs.bib}
 \fancyfoot{}
 \renewcommand{\footrulewidth}{0pt}
 
@@ -49,16 +43,16 @@
 \title{Investigating the Impact of REPA Loss on Training Speed and Generation Quality in Diffusion Models}
 
 \author{%
-  Dmitrii Gromak \\
-  HSE University \\
-  \And
   Evgenii Pakhomov\\
   HSE University\\
+  \And
+  Dmitrii Gromak \\
+  HSE University \\
   \AND
-  Miron Makhlin \\
+  Sergei Kopylov \\
   HSE University \\
   \And
-  Sergey Kopylov \\
+  Miron Makhlin \\
   HSE University \\
   \And
   Vladimir Novikov\\
@@ -67,7 +61,6 @@
 
 \begin{document}
 \maketitle
-
 \begin{abstract}
 Diffusion models have emerged as the dominant paradigm for high-fidelity image generation, yet their training remains
 computationally expensive and slow to converge. Recent work introduced REPA (REPresentation Alignment), a regularization
@@ -85,4 +78,146 @@ particularly in narrow visual domains; and (3) how sensitive REPA is to dataset 
 partially compensate for reduced data availability. Through these experiments, we aim to better characterize the practical benefits
 and limitations of representation alignment for efficient diffusion training in realistic, resource-constrained settings.
 \end{abstract}
+
+\section{Introduction}
+Diffusion models have become one of the main paradigms for high-quality image generation, with successful architectures ranging from U-Net denoisers to latent diffusion models and diffusion transformers~\cite{ronneberger2015unet,ho2020ddpm,rombach2022ldm,peebles2023dit}. However, training such models remains computationally expensive: not only must the model learn the denoising dynamics, but it should also be able to extract useful internal visual representations (discriminative features) in its hidden states~\cite{li2023dreamteacher,xiang2023ddae,chen2024deconstructing,mukhopadhyay2023diffusion}
+
+Recent work on REPA~\cite{yu2025repa} proposes to accelerate diffusion training by explicitly aligning intermediate hidden states of the denoising model with clean image representations extracted by a frozen pretrained visual encoder. This suggests a simple but powerful idea: instead of forcing the diffusion model to discover good internal representations only through the denoising loss, we can use an external representation model as an auxiliary teacher.
+
+In this project, we study representation alignment as a training principle for efficient diffusion modeling under constrained computational settings. We focus on reduced datasets, low-data regimes, and fine-grained visual domains. At first glance, one might expect REPA to be especially useful in such settings, since the pretrained teacher can inject visual knowledge that is unavailable from the small training set alone. However, this advantage is not obvious. Recent evidence from iREPA~\cite{singh2026irepa} suggests that the effectiveness of REPA is determined not merely by the global quality of the teacher encoder, but by the spatial structure of its features. Therefore, in narrow domains, a teacher encoder may provide globally meaningful but locally mismatched representations, which can make the alignment objective less helpful or even harmful.
+
+Our goal is to characterize when REPA improves convergence speed and sample quality, how its effectiveness depends on the pretrained feature extractor and dataset scale, and under which conditions the alignment objective can become a limitation rather than a reliable source of inductive bias. We also will try to verify the usefulness of REPA loss for text-diffusion models, as recently shown by~\cite{junior2026accelerating}.
+
+\section{Related work}
+
+Early attempts to bring representation information into diffusion models were mostly indirect. One line of work sought to make diffusion models themselves stronger representation learners, for example by reformulating score matching for unsupervised representation learning, sharing generative and discriminative parameters in joint diffusion models, or imposing bottlenecks and denoising redesigns that encourage semantically meaningful features~\cite{mittal2024diffusionbasedrepresentationlearning,deja2023learning,Hudson_2024_CVPR,chen2024deconstructing}.
+
+Some researchers tried injecting external semantic representations through multi-stage pipelines rather than direct hidden-state matching: Wuerstchen~\cite{pernias2024wuerstchen} learns a compact semantic image latent that guides diffusion, while Representation-Conditioned Generation~\cite{li2024rcg} first generates self-supervised semantic codes and then conditions image synthesis on them.
+
+REPA differs by making alignment explicit inside a single diffusion model, matching noisy intermediate denoiser features to clean pretrained visual embeddings and using this match as an auxiliary training signal.
+
+iREPA further studies why some teacher encoders are more effective for representation alignment than others. Its main conclusion is that global semantic strength, such as classification accuracy, is not sufficient to explain the benefit of REPA. Instead, spatial structure in patch-level representations appears to be more important for image generation. This is especially relevant for our project, since fine-grained and narrow-domain datasets may require local details that are not well captured by a generic teacher encoder.
+
+Subsequent work has studied how this idea should be adapted across architectures rather than transferred unchanged. In particular, U-REPA~\cite{tian2025urepa} shows that moving REPA to diffusion U-Nets is nontrivial because skip connections, stage-specific block roles, and spatial downsampling make transformer-style tokenwise alignment less effective; to address this, it aligns middle-stage U-Net features, upsamples them after projection, and adds a manifold loss to better bridge U-Net and ViT feature spaces.
+
+REPA-E~\cite{leng2025repae} extends the same principle to end-to-end latent diffusion transformers by jointly tuning the VAE tokenizer and the diffusion model, showing that representation alignment can stabilize a setting where diffusion loss alone is ineffective.
+
+More recently, REPA-style alignment has also been adapted to masked diffusion language models~\cite{junior2026accelerating}, suggesting that representation alignment is evolving from a transformer-specific technique into a broader auxiliary training principle across generative architectures and even modalities.
+
+
+
+\section{Task setting}
+
+We follow the notation of REPA. Let $x \sim \mathcal{D}$ be a clean image from the training distribution, and let
+\[
+z = E(x)
+\]
+be its latent representation produced by the encoder $E$ of a pretrained autoencoder. The base diffusion model follows the SiT velocity-prediction formulation used in REPA. Given Gaussian noise $\epsilon \sim \mathcal{N}(0,I)$, we define an interpolation path
+\[
+z_t = \alpha_t z + \sigma_t \epsilon ,
+\]
+where $t \in [0,1]$ and $\alpha_t,\sigma_t$ determine how the clean latent is gradually transformed into noise. The training target is the velocity of this path with respect to $t$:
+\[
+u_t(z,\epsilon)
+=
+\frac{d z_t}{dt}
+=
+\frac{d\alpha_t}{dt} z
++
+\frac{d\sigma_t}{dt} \epsilon .
+\]
+
+The velocity model $v_\theta(z_t,t)$ is trained to approximate this target:
+\[
+\mathcal{L}_{\mathrm{diff}}(\theta)
+=
+\mathbb{E}_{z,\epsilon,t}
+\left[
+\left\|
+v_\theta(z_t,t) - u_t(z,\epsilon)
+\right\|_2^2
+\right].
+\]
+For the linear interpolation commonly used in this setting, $\alpha_t=1-t$ and $\sigma_t=t$, so $u_t(z,\epsilon)=\epsilon-z$.
+
+REPA adds an auxiliary representation-alignment objective. Let $f$ be a frozen pretrained visual encoder, and let
+\[
+y = f(x) \in \mathbb{R}^{N \times C}
+\]
+be the clean image representation extracted by this encoder, where $N$ is the number of patches and $C$ is the representation dimension. Let $H_\theta^\ell(z_t,t)$ denote the intermediate hidden states of the diffusion transformer at layer $\ell$. A trainable projection head $h_\psi$ maps these hidden states into the teacher representation space.
+
+The REPA loss aligns projected noisy hidden states with clean teacher features by maximizing patch-wise similarity:
+\[
+\mathcal{L}_{\mathrm{REPA}}(\theta,\psi)
+=
+-
+\mathbb{E}_{x,\epsilon,t}
+\left[
+\frac{1}{N}
+\sum_{n=1}^{N}
+\operatorname{sim}
+\left(
+y_n,
+h_\psi(H_\theta^\ell(z_t,t))_n
+\right)
+\right],
+\]
+where $n$ indexes spatial patches and $\operatorname{sim}(\cdot,\cdot)$ denotes the similarity function used for representation alignment.
+
+The final objective is
+\[
+\mathcal{L}(\theta,\psi)
+=
+\mathcal{L}_{\mathrm{diff}}(\theta)
++
+\lambda
+\mathcal{L}_{\mathrm{REPA}}(\theta,\psi),
+\]
+where $\lambda$ controls the strength of the alignment term.
+
+Our main experimental question is whether this auxiliary alignment term improves training in small-scale and narrow-domain settings. We will compare the vanilla diffusion objective against REPA-style training under matched architecture, optimizer, data, and compute budgets. We will also vary the frozen representation encoder $f$ and study whether its representations provide useful guidance for generation.
+
+This setting allows us to test two competing hypotheses. The optimistic hypothesis is that REPA should be especially useful in low-data regimes because the pretrained encoder supplies an external representation prior that the diffusion model would otherwise need to learn from limited data. The skeptical hypothesis is that this prior may be mismatched. In particular, a teacher encoder can encode strong global semantic information while still having patch-level representations that are poorly aligned with the spatial structure required in a narrow domain. In that case, minimizing $\mathcal{L}_{\mathrm{REPA}}$ may force the diffusion model to match representations that are globally meaningful but locally suboptimal for generation, reducing or even reversing the expected benefit of REPA.
+
+\section{Metrics and Evaluation}
+
+We evaluate models along three main axes.
+
+\paragraph{Generation quality.}
+The primary metric for image generation is Fréchet Inception Distance (FID)~\cite{heusel2017fid}, which measures the distributional gap between generated and real images in the feature space of a pretrained Inception-v3 network. Lower FID indicates better quality and diversity together. We will complement FID with qualitative inspection of random samples, since models with similar FID scores can differ noticeably in perceptual quality -- especially on fine-grained domains where structural artifacts may not be captured by Inception features. For Stanford Cars, we will additionally assess part-level coherence, texture realism, and shape consistency. Another important image generation feature is diversity which can be measured using the LPIPS metric as well as manually checking for mode collapse by inspecting the spread of samples.
+
+\paragraph{Training efficiency.}
+Following the evaluation protocol of the original REPA paper~\cite{yu2025repa}, we will plot FID as a function of both training steps and wall-clock time, evaluating checkpoints at fixed intervals (e.g., every 20k steps). This will allows us to compare convergence speed independently from final quality: REPA's core promise is that alignment accelerates the early training phase, so a model with REPA should reach a target FID threshold significantly faster than the baseline. We will report both the step count and GPU-hours required to reach representative FID thresholds as scalar efficiency indicators.
+
+\paragraph{Representation behavior.}
+To understand \emph{why} REPA helps or fails in a given setting, we will try to track several internal diagnostics throughout training. For example, we plan to log the alignment loss $\mathcal{L}_{\mathrm{REPA}}$ alongside the diffusion loss $\mathcal{L}_{\mathrm{diff}}$, as well as monitor the mean cosine similarity between projected hidden states $h_\psi(H_\theta^\ell)$ and teacher patch embeddings $y$. We will also measure linear probing accuracy on the intermediate hidden states of the diffusion model (frozen at various checkpoints) as an indicator of whether the denoiser is learning discriminatively useful representations. Together, these diagnostics help distinguish settings where REPA successfully transfers teacher representations from settings where alignment is achieved superficially without improving generation.
+
+\paragraph{Text diffusion metrics (if time allows).}
+For the masked text diffusion extension, we will use perplexity on a held-out validation set as the primary metric, following~\cite{junior2026accelerating,sahoo2024mdlm}. We will also track the alignment loss and cosine similarity between hidden states and teacher token embeddings to verify that the alignment objective is active and meaningful during training.
+
+\section{Plan}
+
+\paragraph{Step 1: Baseline reproduction.}
+We plan to begin by implementing a self-contained REPA training pipeline on a reduced subset of ImageNet (10\% of classes, $\approx\!130$k images) at $64{\times}64$ resolution, using a SiT-S/2 backbone~\cite{yu2025repa} and DINOv2-B~\cite{singh2026irepa} as the frozen teacher. We will train two models under identical conditions -- one with the REPA loss and one without -- for 400k steps and compare their FID-vs-step curves. Success here means reproducing the qualitative trend of faster convergence with REPA, even if the absolute FID numbers differ from the full-scale result. This phase will validate our infrastructure and gives us a reliable baseline for subsequent ablations.
+
+\paragraph{Step 2: Low-data and fine-grained domain study.}
+We plan to investigate two complementary low-data regimes. First, we subsample ImageNet at four data fractions (1\%, 5\%, 10\%, 20\%) and train REPA vs.\ baseline models to the same step budget, measuring how FID and convergence speed scale with dataset size. We hypothesize that REPA's benefit is largest at moderate data regimes (5--20\%) where the encoder prior can compensate for limited data, but may saturate at very low fractions where neither model can generate coherent images. Second, we will train on Stanford Cars ($\approx\!8$k images), a fine-grained benchmark where object geometry and part structure matter more than global semantics. This tests the hypothesis from iREPA~\cite{singh2026irepa} that teachers with strong global features but weak spatial structure (e.g., CLIP) may be less helpful -- or even harmful -- in domains that require precise local detail.
+
+\paragraph{Step 3: Teacher encoder ablation.}
+We plan to compare three pretrained visual encoders as REPA teachers on both the subsampled ImageNet (10\%) and Stanford Cars settings: DINOv2-B~\cite{singh2026irepa} (strong spatial structure, patch-level features), CLIP ViT-B/32 (strong global semantics, weaker patch structure), and a supervised ResNet-50 (conventional discriminative baseline with no patch-level design). For each teacher, we will measure FID, the alignment loss trajectory, and the linear probing accuracy of the aligned hidden states. This ablation directly tests iREPA's spatial-structure hypothesis in our constrained settings, and determines whether teacher choice should depend on dataset domain.
+
+\paragraph{Step 4: Text diffusion extension.}
+Motivated by~\cite{junior2026accelerating}, who showed that REPA accelerates training of Portuguese Masked Diffusion Language Models (MDLM~\cite{sahoo2024mdlm}) by 28.6\% in perplexity and confirmed that mid-level alignment with a modern language encoder works best, we plan to adapt this finding to English-language masked diffusion. Concretely, we want to train a small MDLM on a text corpus (e.g., WikiText-103) with and without a REPA-style alignment loss. Following~\cite{junior2026accelerating}, we will align intermediate transformer blocks of the MDLM with token representations from a frozen pretrained encoder. We will compare two teacher choices: a bidirectional encoder (BERT-based) and a decoder-based model (GPT-based), mirroring the BERTimbau vs.\ Qwen comparison from the original paper. We will evaluate perplexity on the validation set at fixed training step checkpoints to assess whether the convergence speedup observed for Portuguese generalizes to English and to a different model scale.
+
+\section{Expected outcomes}
+The central output of the project is an empirical characterization of when and why REPA works under constrained settings. For the image experiments, we expect REPA’s convergence benefit to be robust at moderate data scales (5–20\% of ImageNet) but to degrade in very low-data regimes, where the alignment signal becomes too weak relative to the denoising objective to provide a reliable training prior. On fine-grained domains such as Stanford Cars, we expect teacher choice to matter substantially: teachers with strong spatial patch structure (DINOv2) should outperform those with primarily global semantic features (CLIP), consistent with the findings of iREPA~\cite{singh2026irepa}. More broadly, we may find that a teacher which ignores domain-specific visual features can actively harm training by pulling hidden states toward representations that are globally coherent but locally mismatched to the target distribution.
+
+For the text diffusion extension, we expect the qualitative finding of~\cite{junior2026accelerating} to generalize beyond Portuguese: mid-level alignment with a bidirectional encoder should reduce perplexity and accelerate convergence compared to the unaligned baseline, while decoder-based teachers may prove less effective due to their weaker bidirectional token structure. A negative or null result would itself be informative, suggesting that the REPA benefit in text diffusion is tied to specific linguistic or resource conditions rather than being a general property of representation alignment.
+
+Taken together, the project should clarify whether REPA is best understood as a universal training accelerator or as a representation prior whose practical benefit depends jointly on the teacher’s feature structure, the scale and domain of the training data, and the alignment design choices. If REPA proves fragile across these axes, this would motivate follow-up work on adaptive or domain-aware alignment strategies.
+
+\newpage 
+{\sloppy\printbibliography[heading=bibintoc]\par}
+
+
 \end{document}
