@@ -1,0 +1,41 @@
+# Step 1 — Baseline (no REPA), 10% ImageNet, SiT-S/2, 64x64
+# Pure diffusion objective. Fast infrastructure validation run.
+# Latent grid: 64 // 8 = 8x8 = 64 patches.
+# Compare FID-vs-step curve against repa_dinov2_imagenet_10pct_64px.
+
+experiment_name: baseline_imagenet_01pct_256px
+
+# Data
+dataset: imagenet
+data_root: data/imagenet
+cache_dir: cache/imagenet_f001_r256/train
+fraction: 0.10
+resolution: 256
+num_classes: 1000
+
+# Model
+model_size: S        # SiT-S: 12 transformer blocks, hidden_size=384
+in_channels: 4       # VAE latent channels
+patch_size: 2        # 8x8 latent / 2 = 4x4 = 16 tokens
+
+# Teacher (none = pure diffusion baseline, no REPA)
+teacher: none
+align_layer: 6       # unused when teacher=none
+lambda: 0.0
+
+# Training
+total_steps: 400000
+batch_size: 256
+lr: 1.0e-4
+weight_decay: 0.0
+adam_betas: [0.9, 0.999]
+grad_clip: 1.0
+ema_decay: 0.9999
+mixed_precision: true
+seed: 42
+num_workers: 8
+
+# Checkpointing & logging
+checkpoint_dir: checkpoints/baseline_imagenet_01pct_256px
+save_every: 20000
+log_every: 100
