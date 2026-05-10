@@ -1,3 +1,4 @@
 [submodule "REPA"]
 	path = REPA
-	url = https://github.com/sihyun-yu/REPA
+	url = https://github.com/sekopylov/REPA.git
+	branch = main
