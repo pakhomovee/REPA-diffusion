@@ -1,0 +1,23 @@
+# Mark common binary formats so git diff/merge treats them correctly
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.npz binary
+*.npy binary
+*.pt binary
+*.pth binary
+*.ckpt binary
+*.safetensors binary
+
+# Normalize line endings for shell scripts
+*.sh text eol=lf
+
+# Normalize line endings for Python
+*.py text eol=lf
+
+# Normalize line endings for JSON/YAML
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
