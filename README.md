@@ -1,5 +1,4 @@
 # REPA-Diffusion
-
 Research project studying **REPresentation Alignment (REPA)** in diffusion transformers under constrained data and compute.
 
 **Core question:** Does REPA remain a training accelerator when the model is trained on a small dataset (Imagenette, ~9k images), and what happens to generation quality at high guidance scales?
@@ -389,6 +388,117 @@ python scripts/export_stanford_cars_for_repa.py
 ```
 
 Training uses `--num-classes=196` with the same SiT-B/2 + DINOv2-B setup.
+
+---
+
+## CelebA Dataset
+
+CelebA (202 599 face images, 40 binary attributes) is used for class-conditional generation experiments. Classes are defined by a bitmask over a configurable subset of binary attributes (default: `Male`, `Smiling`, `Young`, `Attractive` → **16 classes**).
+
+### Prerequisites
+
+Install extra dependencies if not already present:
+```bash
+pip install gdown natsort
+```
+
+### Step 0 — Clone (with submodule)
+```bash
+git clone --recurse-submodules https://github.com/pakhomovee/REPA-diffusion.git
+cd REPA-diffusion
+git checkout celeba
+git submodule update --init --recursive
+pip install -r REPA/requirements.txt
+pip install gdown natsort
+```
+
+### Step 1 — Export CelebA images
+
+Downloads the dataset automatically from Google Drive (if absent) and exports it to the REPA image-folder format with a `dataset.json`:
+
+```bash
+python scripts/export_celeba_for_repa.py
+```
+
+This creates `data/celeba256/images/` (256×256 centre-cropped JPEGs) and `data/celeba256/dataset.json`.
+
+**Optional overrides:**
+```bash
+python scripts/export_celeba_for_repa.py \
+  --root-dir /path/to/raw/celeba \
+  --output-dir /path/to/celeba256 \
+  --selected-attrs Male Smiling Young \
+  --resolution 256
+```
+
+> `--selected-attrs` controls which binary attributes define the class label.  
+> Number of classes = 2^(number of selected attributes).
+
+### Step 2 — Encode VAE latents
+
+REPA trains on precomputed SD-VAE latents, not raw pixels:
+
+```bash
+cd REPA/preprocessing
+python dataset_tools.py encode \
+    --source ../../data/celeba256 \
+    --dest ../../data/celeba256/vae-sd \
+    --model-url stabilityai/sd-vae-ft-mse
+cd ../..
+```
+
+Expected output layout after both steps:
+```
+data/celeba256/
+    images/          <- raw 256x256 JPEGs
+    vae-sd/          <- .npy latents + dataset.json
+    dataset.json     <- top-level labels
+```
+
+### Step 3 — Training
+
+**Baseline (no REPA alignment):**
+```bash
+bash scripts/run_celeba_baseline.sh
+```
+
+**REPA with DINOv2-B encoder:**
+```bash
+bash scripts/run_celeba_repa.sh
+```
+
+Both scripts default to 6 GPUs. Override via environment variables:
+```bash
+NUM_PROCESSES=1 \
+CUDA_VISIBLE_DEVICES=0 \
+BATCH_SIZE=64 \
+MAX_TRAIN_STEPS=50000 \
+CHECKPOINTING_STEPS=5000 \
+EXP_NAME=celeba_test \
+bash scripts/run_celeba_repa.sh
+```
+
+If you used non-default `--selected-attrs` in Step 1, pass the matching class count:
+```bash
+NUM_CLASSES=8 bash scripts/run_celeba_repa.sh   # e.g. 3 attributes -> 2^3=8
+```
+
+### Step 4 — Monitor
+```bash
+./scripts/start_tensorboard.sh
+```
+
+### CelebA Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Model | SiT-B/2 |
+| Resolution | 256×256 |
+| Default attributes | Male, Smiling, Young, Attractive |
+| Num classes (default) | 16 (= 2⁴) |
+| REPA teacher | DINOv2-ViT-B |
+| REPA proj coeff | 0.5 |
+| Default max steps | 100 000 |
 
 ---
 
