@@ -44,6 +44,13 @@ class CelebADataset(Dataset):
 
         # Load file names
         self.filenames = os.listdir(self.dataset_folder)
+                             # Handle nested extraction: gdown sometimes extracts to img_align_celeba/celeba/
+        # In that case, descend into the single subdirectory to find the actual images.
+        subdirs = [f for f in self.filenames if os.path.isdir(os.path.join(self.dataset_folder, f))]
+        if subdirs and len(subdirs) == len(self.filenames):
+            # All entries are directories — descend into the first one
+            self.dataset_folder = os.path.join(self.dataset_folder, subdirs[0])
+            self.filenames = os.listdir(self.dataset_folder)
         # Ensure consistent ordering (important if you rely on index-based consistency)
         self.filenames = SORTFN(self.filenames)
 
