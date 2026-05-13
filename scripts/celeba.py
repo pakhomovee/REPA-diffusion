@@ -90,7 +90,7 @@ class CelebADataset(Dataset):
         os.makedirs(self.root_dir, exist_ok=True)
         zip_path = os.path.join(self.root_dir, "img_align_celeba.zip")
         if not os.path.isfile(zip_path):
-            file_id = "1zVyBr0Q667RK0j6QANLAajNQxp3yWOl"
+            file_id = "1zVyBr0Q667RK_0j6QANLAajNQxp3yWOl"
             gdown.download(id=file_id, output=zip_path, quiet=False)
         else:
             print(f"Found existing ZIP file at {zip_path}. Skipping download.")
