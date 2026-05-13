@@ -148,7 +148,7 @@ def make_get_class(header: list[str], selected_attrs: list[str]):
     powers = 2 ** torch.arange(len(indices))
 
     def get_class_fn(info_dict: dict) -> torch.Tensor:
-        bits = info_dict['attributes'][indices].clamp(min=0)
+                bits = info_dict['attributes'][:, indices].clamp(min=0)
         return (bits * powers).sum(dim=1).long()
 
     return get_class_fn  # Return both
