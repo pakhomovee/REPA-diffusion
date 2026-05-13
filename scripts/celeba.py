@@ -42,15 +42,12 @@ class CelebADataset(Dataset):
             # The unzipped folder will be root_dir/img_align_celeba
             self.download_images()
 
-        # Load file names
-        self.filenames = os.listdir(self.dataset_folder)
-                             # Handle nested extraction: gdown sometimes extracts to img_align_celeba/celeba/
-        # In that case, descend into the single subdirectory to find the actual images.
-        subdirs = [f for f in self.filenames if os.path.isdir(os.path.join(self.dataset_folder, f))]
-        if subdirs and len(subdirs) == len(self.filenames):
-            # All entries are directories — descend into the first one
-            self.dataset_folder = os.path.join(self.dataset_folder, subdirs[0])
-            self.filenames = os.listdir(self.dataset_folder)
+        # Load file names - keep only files, not subdirectories.
+        # gdown sometimes extracts into a nested subdirectory
+        # (e.g. img_align_celeba/celeba/), so we filter those out here.
+        all_entries = os.listdir(self.dataset_folder)
+        self.filenames = [f for f in all_entries
+                          if os.path.isfile(os.path.join(self.dataset_folder, f))]
         # Ensure consistent ordering (important if you rely on index-based consistency)
         self.filenames = SORTFN(self.filenames)
 
@@ -97,7 +94,7 @@ class CelebADataset(Dataset):
         os.makedirs(self.root_dir, exist_ok=True)
         zip_path = os.path.join(self.root_dir, "img_align_celeba.zip")
         if not os.path.isfile(zip_path):
-            file_id = "1zVyBr0Q667RK_0j6QANLAajNQxp3yWOl"
+            file_id = "1zVyBr0Q667RK0j6QANLAajNQxp3yWOl"
             gdown.download(id=file_id, output=zip_path, quiet=False)
         else:
             print(f"Found existing ZIP file at {zip_path}. Skipping download.")
@@ -155,7 +152,7 @@ def make_get_class(header: list[str], selected_attrs: list[str]):
     powers = 2 ** torch.arange(len(indices))
 
     def get_class_fn(info_dict: dict) -> torch.Tensor:
-                bits = info_dict['attributes'][:, indices].clamp(min=0)
+        bits = info_dict['attributes'][:, indices].clamp(min=0)
         return (bits * powers).sum(dim=1).long()
 
     return get_class_fn  # Return both
