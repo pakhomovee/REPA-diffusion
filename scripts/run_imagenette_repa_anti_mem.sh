@@ -8,6 +8,7 @@ export CUDA_VISIBLE_DEVICES="0,1"
 export OMP_NUM_THREADS="8"
 export MKL_NUM_THREADS="8"
 export WANDB_MODE="disabled"
+export PYTORCH_ALLOC_CONF="expandable_segments:True"
 
 NUM_PROCESSES="2"
 LOCAL_BATCH="64"
@@ -19,7 +20,7 @@ ACCUM_STEPS="2"
 #   "flip_only" fast fallback: horizontal flip only, no extra VAE pass
 #               → use on Colab free tier if VAE re-encoding is too slow
 # ---------------------------------------------------------------------------
-AUGMENT_MODE="vae"
+AUGMENT_MODE="flip_only"
 
 # Pre-download DINOv2-Small so multi-GPU doesn't race on extract
 python -c "import torch; torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14')"
