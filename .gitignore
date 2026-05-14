@@ -1,11 +1,50 @@
-# LaTeX auxiliary files (sources live in tex/)
-*.aux
-*.bbl
-*.blg
-*.fdb_latexmk
-*.fls
-*.log
-*.out
-*.synctex.gz
-*.toc
-tex/*.pdf
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Experiment outputs — heavy, machine-local, never committed
+exps/
+outputs/
+runs/
+logs/
+wandb/
+samples/
+checkpoints/
+pretrained_models/
+ckpts/
+
+# Data and generated artifacts — never committed
+data/
+datasets/
+*.npz
+*.npy
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Cached model weights downloaded at runtime
+*.bin
+hub/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets / credentials — never commit
+*.env
+.env
+secrets.*
+
+# Internal agent working notes — not for public consumption
+AGENT_NOTES.md
+
+# Analysis CSVs with absolute machine paths
+reports/**/*.csv
+
