@@ -12,17 +12,10 @@ export PYTORCH_ALLOC_CONF="expandable_segments:True"
 
 NUM_PROCESSES="2"
 LOCAL_BATCH="64"
-ACCUM_STEPS="2"
-
-# ---------------------------------------------------------------------------
-# Augmentation mode — choose one:
-#   "vae"       correct: re-encodes with VAE after crop+flip+jitter (default)
-#   "flip_only" fast fallback: horizontal flip only, no extra VAE pass
-#               → use on Colab free tier if VAE re-encoding is too slow
-# ---------------------------------------------------------------------------
+ACCUM_STEPS="2"   # effective batch = 64 * 2 * 2 = 256
 AUGMENT_MODE="flip_only"
 
-# Pre-download DINOv2-Small so multi-GPU doesn't race on extract
+# Warm the teacher weights once to avoid multi-process hub races.
 python -c "import torch; torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14')"
 
 accelerate launch \
@@ -40,23 +33,26 @@ accelerate launch \
   --model="SiT-B-shallow/2" \
   --num-classes=10 \
   --enc-type="dinov2-vit-s" \
-  --proj-coeff=0.5 \
   --encoder-depth=4 \
   --output-dir="../runs" \
   --logging-dir="logs" \
-  --exp-name="imagenette_repa_smart_anti_overfit" \
+  --exp-name="imagenette_repa_stable" \
   --data-dir="../data/imagenette256-train" \
   --resolution=256 \
   --batch-size=$(( LOCAL_BATCH * NUM_PROCESSES )) \
   --gradient-accumulation-steps="${ACCUM_STEPS}" \
-  --max-train-steps=15000 \
-  --checkpointing-steps=3000 \
-  --sampling-steps=3000 \
-  --no-sample-at-step-one \
+  --learning-rate=1e-4 \
+  --adam-weight-decay=0.05 \
+  --max-grad-norm=1.0 \
+  --max-train-steps=50000 \
+  --checkpointing-steps=10000 \
+  --sampling-steps=10000 \
   --num-workers=4 \
+  --cfg-prob=0.2 \
+  --proj-coeff=0.8 \
+  --div-coeff=0.0 \
   --augment \
   --augment-mode="${AUGMENT_MODE}" \
-  --div-coeff=0.01 \
   --sample-cfg-scale=2.0 \
-  --adam-weight-decay=0.03 \
-  --cfg-prob=0.2
+  --no-sample-at-step-one \
+  --log-every=100
