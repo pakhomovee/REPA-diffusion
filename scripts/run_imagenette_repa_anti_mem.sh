@@ -5,8 +5,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT/REPA"
 
 export CUDA_VISIBLE_DEVICES="0,1"
-export OMP_NUM_THREADS="8"
-export MKL_NUM_THREADS="8"
+export OMP_NUM_THREADS="1"   # CHANGED from 8
+export MKL_NUM_THREADS="1"   # CHANGED from 8
 export WANDB_MODE="disabled"
 export PYTORCH_ALLOC_CONF="expandable_segments:True"
 
@@ -47,7 +47,7 @@ accelerate launch \
   --max-train-steps=50000 \
   --checkpointing-steps=10000 \
   --sampling-steps=10000 \
-  --num-workers=4 \
+  --num-workers=2 \
   --cfg-prob=0.2 \
   --proj-coeff=0.8 \
   --div-coeff=0.0 \
