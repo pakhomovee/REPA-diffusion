@@ -5,14 +5,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT/REPA"
 
 export CUDA_VISIBLE_DEVICES="0,1"
-export OMP_NUM_THREADS="1"   # CHANGED from 8
-export MKL_NUM_THREADS="1"   # CHANGED from 8
+export OMP_NUM_THREADS="1"   
+export MKL_NUM_THREADS="1"   
 export WANDB_MODE="disabled"
 export PYTORCH_ALLOC_CONF="expandable_segments:True"
 
 NUM_PROCESSES="2"
-LOCAL_BATCH="64"
-ACCUM_STEPS="2"   # effective batch = 64 * 2 * 2 = 256
+LOCAL_BATCH="128"
+ACCUM_STEPS="1"
 AUGMENT_MODE="flip_only"
 
 # Warm the teacher weights once to avoid multi-process hub races.
