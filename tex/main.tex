@@ -276,18 +276,20 @@ in terms of FID and improved stability of model features during training.
 
 \subsection{Imagenette}
 
-We first train on Imagenette — a subset of ImageNet containing 10 easily classified
+We first train on Imagenette -- a subset of ImageNet containing 10 easily classified
 classes with approximately 1\,000 samples per class. After 100\,000 iterations the
 standard SiT-B/2 model (depth 12, no augmentation) achieves good generation quality,
 but at a cost: it is sufficiently large to memorize the entire dataset, a tendency
 amplified by the REPA loss, as shown in Figure~\ref{imagenette:memorization}. This
-reveals a key risk of applying diffusion models to small-scale datasets — complete
+reveals a key risk of applying diffusion models to small-scale datasets -- complete
 training set memorization rather than genuine generalization.
+
+\subsubsection{Tackling memorization}
 
 We first attempted to suppress memorization with an auxiliary batch-variance
 diversity loss that penalized low variance across outputs produced from different
-noise inputs within a batch. We removed an L2 normalization that destroyed the
-variance scale and a \texttt{.item()} call that detached the loss from the
+noise inputs within a batch. We removed L2 normalization that destroyed the
+variance scale and \texttt{.item()} call that detached the loss from the
 computation graph. After these fixes the loss collapsed to zero within roughly
 100 training steps: the objective is trivially satisfied by high-frequency
 colorful noise, which directly conflicts with the structured denoising task.
@@ -312,18 +314,18 @@ REPA model (depth 12, no augmentation) after 100k training steps. We use a
 classifier-free guidance scale of $w=4.0$, which gives the best perceptual quality
 for this model, and evaluate three metrics:
 \begin{itemize}
-    \item \textbf{Nearest-neighbor similarity}: cosine similarity between DINOv2 patch
+    \item \emph{Nearest-neighbor similarity}: cosine similarity between DINOv2 patch
           features of generated images and the training set. A value close to 1 indicates
           near-exact copying.
-    \item \textbf{Classification accuracy}: ResNet-50 fine-tuned on ImageNet, evaluated
+    \item \emph{Classification accuracy}: ResNet-50 fine-tuned on ImageNet, evaluated
           on the 10 Imagenette classes (chance level 10\%).
-    \item \textbf{Diversity}: mean pairwise LPIPS distance over 200 randomly selected
+    \item \emph{Diversity}: mean pairwise LPIPS distance over 200 randomly selected
           generations. Higher values indicate more varied outputs.
 \end{itemize}
 
 The results, summarised in Table~\ref{tab:imagenette_comparison}, show clear memorization.
 The mean similarity of $0.701$ and, more strikingly, $28\%$ of generations have a
-training image with similarity $>0.9$ — a strong indicator of near-copying. The
+training image with similarity $>0.9$ -- a strong indicator of near-copying. The
 classification accuracy of $78\%$ is unrealistically high for a generative model
 trained on only 10k images; it confirms that the model reproduces training examples
 with their original labels. Despite this, diversity remains moderate ($0.689$),
@@ -346,12 +348,12 @@ New (depth 6, flip)     & 0.470 &  0.0\% & 51.0\% & 0.682 \\
 
 Qualitative evidence supports this diagnosis. Figure~\ref{fig:old_gen} shows ten
 randomly selected samples from the old model; although the outputs look plausible at
-a glance, many are near-identical copies of training images.
+first glance, many are near-identical copies of training images.
 Figure~\ref{fig:old_nn} displays the five most similar pairs (generated image and
 its nearest training neighbour), where the visual resemblance is often
 indistinguishable.
 
-\begin{figure}[!htb]
+\begin{figure}
   \centering
   \includegraphics[width=\linewidth]{images/old_model_10_samples.png}
   \caption{Ten random generated images from the old model (depth 12, no augmentation) after 100k steps, CFG=4.0.}
@@ -373,7 +375,7 @@ augmentation, after 100k steps and sampled at CFG=4.0. The results are
 shown in Table~\ref{tab:imagenette_comparison}. The mean similarity drops to
 $0.470$, and crucially, \emph{no} generation has a training neighbour with
 similarity $>0.9$ (0.0\%). The classification accuracy falls to a more
-reasonable $51\%$ — still well above chance, indicating that the model has
+reasonable $51\%$ -- still well above chance, indicating that the model has
 learned meaningful class distinctions without memorizing specific examples.
 Diversity remains virtually unchanged ($0.682$), confirming that the
 mitigations do not harm output variety.
@@ -382,7 +384,7 @@ Figure~\ref{fig:new_gen} presents ten random samples from the new model. The
 images are visually distinct and exhibit greater intra-class variation than
 those from the old model. Figure~\ref{fig:new_nn} shows the five most similar
 pairs; the nearest training images are now clearly different in pose, lighting,
-or fine details — no exact copies appear.
+or fine details -- no exact copies appear.
 
 \begin{figure}[!htb]
   \centering
@@ -394,12 +396,12 @@ or fine details — no exact copies appear.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/new_model_top5_nn.png}
-  \caption{Top‑5 most similar pairs for the new model — no near‑copies are present.}
+  \caption{Top‑5 most similar pairs for the new model -- no near‑copies are present.}
   \label{fig:new_nn}
 \end{figure}
 \clearpage
 
-\paragraph{Discussion.}
+\paragraph{Key takeaways.}
 
 The shallow architecture (depth 6) reduces the model's capacity to memorize
 the training set while still being expressive enough to learn the target
@@ -423,7 +425,7 @@ benchmarks.
 \subsection{CelebA}
 
 Since training on small, multi-domain datasets leads to memorization, we investigate
-whether a single-domain dataset can mitigate this issue. We select the Large-scale
+whether single-domain datasets are subject to this issue as well. We select the
 CelebFaces Attributes (CelebA) dataset as our fine-grained benchmark and train the
 diffusion model on it. Notably, the memorization problem does not arise here, as
 illustrated in Figure~\ref{celeba:memorization}, enabling analysis analogous to that
@@ -441,7 +443,7 @@ FID: at 50\,000 iterations, REPA already improves over the baseline
 persists as both models continue to improve, with REPA maintaining lower FID
 throughout the evaluated range. Taking the final baseline FID at 200\,000
 iterations as a target, REPA reaches comparable quality after roughly
-130\,000--140\,000 iterations, corresponding to an approximately $1.5{\times}$
+130\,000 -- 140\,000 iterations, corresponding to an approximately $1.5{\times}$
 improvement in learning speed. The KID curve supports the same qualitative
 conclusion, but less decisively: REPA is also usually below the baseline, yet the
 two trajectories are much closer and nearly overlap after the early checkpoints.
@@ -576,11 +578,11 @@ as columns.
   \label{fig:pca_layers}
 \end{figure}
 
-In both the \emph{Baseline} and \emph{REPA} models, semantic structure is already present in the early layers. From blocks~1--6 at $t = 0.5$ and $t = 0.7$, the PCA maps of both models show clear spatial partitioning: face, hair, and background regions are assigned distinct colour clusters. This is consistent with the observation made earlier that CelebA's spatial homogeneity makes basic face-region separation a low-effort task that both models learn readily.
+In both the \emph{Baseline} and \emph{REPA} models, semantic structure is already present in the early layers. From blocks 1 -- 6 at $t = 0.5$ and $t = 0.7$, the PCA maps of both models show clear spatial partitioning: face, hair, and background regions are assigned distinct colour clusters. This is consistent with the observation made earlier that CelebA's spatial homogeneity makes basic face-region separation a low-effort task that both models learn readily.
 
 The critical difference between the two models appears in blocks~7--9, where the Baseline maps collapse into spatially incoherent noise while the REPA maps maintain structured, interpretable regions. This mid-network collapse in the Baseline suggests that its intermediate representations undergo an unstructured transition between the early feature-building phase and the final velocity-prediction layers. REPA's alignment regularisation, acting at block~8, anchors this transition: instead of dissolving into noise, the representations remain semantically organised through the middle of the network.
 
-The timestep axis amplifies this contrast sharply. At $t = 0.9$ (near-pure Gaussian noise) the Baseline maps are largely uniform and flat from block~3 onward, recovering only a faint spatial gradient in the final blocks. REPA maps at $t = 0.9$, by contrast, retain a coherent face-background separation throughout most of the network depth, with the characteristic face-centred blob clearly visible even in layers 5--8. This confirms that REPA does not merely reorganise representations that the Baseline would form anyway --- it builds representations that are fundamentally more robust to the destruction of pixel-level signal.
+The timestep axis amplifies this contrast sharply. At $t = 0.9$ (near-pure Gaussian noise) the Baseline maps are largely uniform and flat from block~3 onward, recovering only a faint spatial gradient in the final blocks. REPA maps at $t = 0.9$, by contrast, retain a coherent face-background separation throughout most of the network depth, with the characteristic face-centred blob clearly visible even in layers 5--8. This confirms that REPA does not merely reorganise representations that the Baseline would form anyway -- it builds representations that are fundamentally more robust to the destruction of pixel-level signal.
 
 To summarise, Representation Alignment produces two distinct effects visible in this figure: it \emph{stabilises} the mid-network transition that causes blocks~7--9 to collapse in the Baseline, and it makes the resulting representations \emph{noise-robust}, preserving semantic structure at timesteps where the Baseline loses it entirely. 
 
