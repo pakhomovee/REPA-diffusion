@@ -13,6 +13,8 @@
 \usepackage{url}
 \usepackage{booktabs}
 \usepackage{amsfonts}
+\usepackage{subcaption}
+\usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{nicefrac}
 \usepackage{microtype}
@@ -228,7 +230,102 @@ For the text diffusion extension, we expect the qualitative finding of~\cite{jun
 Taken together, the project should clarify whether REPA is best understood as a universal training accelerator or as a representation prior whose practical benefit depends jointly on the teacher’s feature structure, the scale and domain of the training data, and the alignment design choices. If REPA proves fragile across these axes, this would motivate follow-up work on adaptive or domain-aware alignment strategies.
 
 \newpage 
-{\sloppy\printbibliography[heading=bibintoc]\par}
 
+\section{Baseline Reproduction}
+
+We begin by reproducing the key results of the original REPA paper: faster convergence
+in terms of FID and improved stability of model features during training.
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/repa_100k_imagenette_mem.png}
+    \caption{Imagenette}
+    \label{imagenette:memorization}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/repa_celeba_memorization.png}
+    \caption{CelebA}
+    \label{celeba:memorization}
+  \end{subfigure}
+  \caption{Memorization examples on Imagenette and CelebA. See full examples in Appendix A.}
+  \label{fig:memorization_combined}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/fid_no_ema.jpeg}
+    \caption{FID}
+    \label{celeba:fid_no_ema}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/kid_no_ema.jpeg}
+    \caption{KID}
+    \label{celeba:kid_no_ema}
+  \end{subfigure}
+  \caption{FID and KID plots for training checkpoints}
+  \label{fig:memorization_combined}
+\end{figure}
+
+\subsection{Imagenette}
+
+We first train on Imagenette -- a subset of ImageNet containing 10 easily classified
+classes with approximately 1\,000 samples per class. After 100\,000 iterations, the
+model achieves good generation quality, but at a cost: the model is sufficiently large
+to memorize the entire dataset, a tendency amplified by the REPA loss, as shown in
+Figure~\ref{imagenette:memorization}. This reveals a key risk of applying diffusion
+models to small-scale datasets -- complete training set memorization rather than
+genuine generalization.
+
+We address this problem by [MIRON].
+
+\subsection{CelebA}
+
+Since training on small, multi-domain datasets leads to memorization, we investigate
+whether a single-domain dataset can mitigate this issue. We select the Large-scale
+CelebFaces Attributes (CelebA) dataset as our fine-grained benchmark and train the
+diffusion model on it. Notably, the memorization problem does not arise here, as
+illustrated in Figure~\ref{celeba:memorization}, enabling analysis analogous to that
+in the original REPA paper.
+
+\subsubsection{Training Speedup Analysis}
+
+Figure~\ref{fig:memorization_combined} shows FID and KID as a function of training
+iteration. Both models improve steadily in generation quality. Early in training, the
+REPA model exhibits higher total loss, consistent with the original paper's observation
+that the alignment term adds overhead while the model is still learning to extract
+meaningful features. By iteration 30\,000 this gap closes, and by iteration 70\,000
+the REPA model reaches $\mathrm{FID}\approx 11$ -- a threshold the baseline only
+reaches at iteration 180\,000. This corresponds to a $2.5\times$ speedup in early
+training, corroborated by the KID curve, where the REPA model also attains its
+all-time minimum at iteration 70\,000.
+
+Beyond this point, both models' metrics degrade at a similar rate. Once
+$\mathcal{L}_{\mathrm{REPA}}$ approaches zero around iteration 70\,000, the remaining
+gradient signal comes entirely from the diffusion loss, causing the two training curves
+to converge. The periodic quality dips visible in both curves likely reflect transient
+instabilities from a learning rate that is too high at later stages. It is also worth
+noting that these metrics are evaluated on the non-EMA model, which amplifies
+measurement noise.
+
+We attribute the early saturation of REPA's benefit to the relative simplicity of
+CelebA's spatial structure: facial images share consistent geometry, pose, and
+composition, allowing the model to absorb the essential representational signal from
+the teacher within 70\,000 iterations, after which training reduces to standard
+diffusion fine-tuning.
+
+\subsubsection{DIMA, feature maps analysis, Appendix B}
+
+\subsubsection{VOVA, attribute direction vectors analysis, appendix C}
+
+\newpage
+{\sloppy\printbibliography[heading=bibintoc]\par}
 
 \end{document}

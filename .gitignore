@@ -48,3 +48,15 @@ AGENT_NOTES.md
 # Analysis CSVs with absolute machine paths
 reports/**/*.csv
 
+# tex generation
+
+main.aux
+main.bbl
+main.bcf
+main.blg
+main.fdb_latexmk
+main.fls
+main.log
+main.out
+main.run.xml
+main.synctex.gz
