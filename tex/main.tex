@@ -351,13 +351,12 @@ Figure~\ref{fig:old_nn} displays the five most similar pairs (generated image an
 its nearest training neighbour), where the visual resemblance is often
 indistinguishable.
 
-\begin{figure}[p]
+\begin{figure}[!htb]
   \centering
-  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/old_model_10_samples.png}
+  \includegraphics[width=\linewidth]{images/old_model_10_samples.png}
   \caption{Ten random generated images from the old model (depth 12, no augmentation) after 100k steps, CFG=4.0.}
   \label{fig:old_gen}
 \end{figure}
-\clearpage
 
 \begin{figure}[p]
   \centering
@@ -385,13 +384,12 @@ those from the old model. Figure~\ref{fig:new_nn} shows the five most similar
 pairs; the nearest training images are now clearly different in pose, lighting,
 or fine details — no exact copies appear.
 
-\begin{figure}[p]
+\begin{figure}[!htb]
   \centering
-  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/new_model_10_samples.png}
+  \includegraphics[width=\linewidth]{images/new_model_10_samples.png}
   \caption{Ten random generated images from the new model (depth 6, flip augmentation) after 100k steps, CFG=4.0.}
   \label{fig:new_gen}
 \end{figure}
-\clearpage
 
 \begin{figure}[p]
   \centering
