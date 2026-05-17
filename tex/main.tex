@@ -305,7 +305,10 @@ objective by the first evaluated checkpoint. The improvement is most visible in
 FID: at 50\,000 iterations, REPA already improves over the baseline
 ($\mathrm{FID}\approx 14.0$ versus $\mathrm{FID}\approx 15.2$), and this gap
 persists as both models continue to improve, with REPA maintaining lower FID
-throughout the evaluated range. The KID curve supports the same qualitative
+throughout the evaluated range. Taking the final baseline FID at 200\,000
+iterations as a target, REPA reaches comparable quality after roughly
+130\,000--140\,000 iterations, corresponding to an approximately $1.5{\times}$
+improvement in learning speed. The KID curve supports the same qualitative
 conclusion, but less decisively: REPA is also usually below the baseline, yet the
 two trajectories are much closer and nearly overlap after the early checkpoints.
 
