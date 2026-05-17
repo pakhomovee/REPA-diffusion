@@ -321,7 +321,188 @@ composition, allowing the model to absorb the essential representational signal 
 the teacher within 70\,000 iterations, after which training reduces to standard
 diffusion fine-tuning.
 
-\subsubsection{DIMA, feature maps analysis, Appendix B}
+\subsubsection{Structural Analysis}
+
+To move beyond scalar metrics such as FID and KID, we analyse the internal
+representations of both models directly by visualising the patch-level hidden
+states at each transformer block. This section describes how those
+visualisations are constructed and what they reveal about the effect of REPA
+on a face-generation task conditioned on facial attributes.
+
+\paragraph{Construction of PCA Feature Maps.}
+
+A SiT-B/2 transformer processes its input as a sequence of spatial patches.
+After the VAE encodes a $256{\times}256$ image into a $32{\times}32{\times}4$
+latent $z_0$, a patch embedding layer with patch size~2 splits this into
+$16{\times}16 = 256$ tokens, each carrying a 768-dimensional feature vector.
+At every transformer block $\ell \in \{1, \dots, 12\}$ the model produces a
+hidden state matrix
+\[
+  H^{(\ell)} \in \mathbb{R}^{256 \times 768}.
+\]
+To visualise the geometry of this representation space, forward hooks are
+registered on every block simultaneously so that a \emph{single} forward pass
+captures all 12 hidden states at once. The input to the model is a noisy
+latent constructed via the linear stochastic interpolant
+\[
+  z_t = (1 - t)\,z_0 + t\,\varepsilon, \quad
+  \varepsilon \sim \mathcal{N}(0, I),
+\]
+evaluated at three noise levels $t \in \{0.5,\, 0.7,\, 0.9\}$ to probe how
+representations change as the signal-to-noise ratio decreases.
+
+At each block the 256 token vectors are projected to three dimensions via PCA:
+\[
+  \widetilde{H}^{(\ell)} = \operatorname{PCA}_3\!\left(H^{(\ell)}\right)
+  \in \mathbb{R}^{256 \times 3}.
+\]
+Each component is normalised channel-wise to $[0, 1]$, reshaped to a
+$16{\times}16{\times}3$ spatial grid, and upsampled to $128{\times}128$ pixels
+for display. Patches whose token vectors are similar appear in the same colour,
+so the map is a spatial portrait of what the model considers semantically
+equivalent at that depth.
+
+A critical implementation detail is that the PCA for each layer is fitted
+\emph{jointly} on the concatenated token matrices of the Baseline and REPA
+models:
+\[
+  \operatorname{PCA}_3\!\Bigl(
+    \bigl[H^{(\ell)}_{\text{Base}};\; H^{(\ell)}_{\text{REPA}}\bigr]
+  \Bigr),
+\]
+so both models share the same colour axes. Without this, a colour difference
+between the two maps could reflect an arbitrary rotation of the PCA solution
+rather than a genuine representational difference. The joint fitting guarantees
+that identical colours encode identical representations across models.
+
+\paragraph{Layer-wise Progression and Noise Robustness.}
+
+Figure~\ref{fig:pca_layers} shows PCA feature maps for a representative image
+across all 12 transformer blocks and three noise levels $t \in \{0.5, 0.7,
+0.9\}$. For each timestep, rows correspond to the original photograph, the
+Baseline PCA map, and the REPA PCA map respectively, with transformer blocks
+as columns.
+
+\begin{figure}[h]
+  \centering
+  %\includegraphics[width=\linewidth]{figure1.png}
+  \caption{%
+    PCA feature maps across all 12 transformer blocks and three noise levels.
+    For each timestep group, rows show: the original CelebA image, the
+    Baseline hidden-state PCA map, and the REPA hidden-state PCA map.
+    Columns correspond to transformer blocks 1--12 (left to right).
+  }
+  \label{fig:pca_layers}
+\end{figure}
+
+In the \emph{Baseline} model, PCA maps remain largely unstructured through
+the first five to six blocks. Patches from visually distinct face regions --
+hair, skin, eyes, background -- are assigned similar colours, indicating that
+early token representations do not yet differentiate semantic content.
+Meaningful spatial organisation appears only in the final two or three blocks,
+and even there it is coarser than what REPA achieves.
+
+In the \emph{REPA} model, semantic structure emerges substantially earlier.
+Already by block~6, the PCA maps consistently partition the image into coherent
+face regions: a compact colour cluster for skin, a distinct cluster for hair,
+and a separate background region. This earlier formation is a direct consequence
+of representation alignment.
+
+The timestep axis reveals the most striking contrast. At $t = 0.5$ (moderate
+noise) both models produce partially structured maps in the middle layers. At
+$t = 0.9$ (near-pure Gaussian noise) the Baseline maps collapse to spatially
+incoherent patterns at all but the deepest blocks, while REPA maps retain clear
+semantic region boundaries. This is particularly telling on CelebA: because all
+faces share nearly the same spatial layout, a model can recover coarse
+centre-face structure at high noise simply by memorising positional priors,
+without encoding any attribute-level content. The Baseline exploits this
+shortcut. REPA maps, anchored to DINOv2 features that encode attribute-level
+content, maintain finer internal structure -- skin, hair boundary, eye region
+-- even when the noisy input carries almost no pixel-level signal.
+
+To conclude, Representation Alignment enables the model to learn coherent, meaningful features
+on early layers as well as makes these features more robust and stable so that
+they can be reliably extracted even from pictures with low pixel-level signal. 
+
+\paragraph{Attribute-Specific Separability.}
+
+Our training setup conditions the model on 16 class labels derived from four
+binary attributes: \emph{Male}, \emph{Smiling}, \emph{Young}, and
+\emph{Attractive}. This allows us to assess whether REPA's representational
+improvements are attribute-dependent -- an analysis that goes beyond the
+original paper's ImageNet evaluation.
+
+Figure~\ref{fig:attr_sep} shows representative image pairs for each attribute,
+selected automatically to satisfy three constraints. First, each pair is
+\emph{controlled}: the two images belong to class labels that differ in exactly
+one attribute bit while all other three attributes are identical, isolating the
+effect of the target attribute. Second, pairs are required to be visually
+similar in terms of pixel-level MSE, controlling for pose, lighting, and
+background. Third, no image is reused across attribute panels. Among candidate
+pairs satisfying these constraints, we select the one that maximises the
+relative gain in mean patch-level cosine distance under REPA compared to the
+Baseline:
+\[
+  \text{score} = \frac{d_{\text{REPA}} - d_{\text{Baseline}}}
+                      {d_{\text{Baseline}} + \varepsilon},
+  \quad
+  d(A, B) = 1 - \frac{1}{N}\sum_{n=1}^{N}
+    \frac{A^{[n]} \cdot B^{[n]}}{\|A^{[n]}\|\,\|B^{[n]}\|}.
+\]
+
+\begin{figure}[h]
+  \centering
+  %\includegraphics[width=\linewidth]{figure2.png}
+  \caption{%
+    Attribute-specific feature map separability at block~8 and $t = 0.5$.
+    The figure is arranged as a $2{\times}2$ grid of attribute panels
+    (Male, Smiling, Young, Attractive).
+    Within each panel, the two rows show images differing only in the target
+    attribute (all other attributes held fixed); columns show the original
+    photograph, the Baseline PCA map, and the REPA PCA map.
+    Pairs were selected automatically to be visually similar and to maximise
+    REPA's relative token-space separation gain over Baseline.
+  }
+  \label{fig:attr_sep}
+\end{figure}
+
+The results exhibit a clear attribute-dependent hierarchy.
+\emph{Male} shows the largest visual separation under REPA: colour clusters
+corresponding to hair, skin tone, and facial structure diverge markedly between
+the Male=N and Male=Y rows in the REPA maps, while the Baseline maps remain
+nearly indistinguishable. Gender is one of the strongest signals encoded by
+DINOv2, providing a rich teacher signal for the alignment loss.
+\emph{Smiling} produces a spatially localised effect: a distinct patch
+cluster appears around the lower-face region for Smiling=Y images in the REPA
+maps, reflecting alignment of mouth-area tokens with DINOv2 features sensitive
+to facial expression; this cluster is absent in the Baseline.
+\emph{Young} yields moderate gains, consistent with age-related textural
+information (skin smoothness, fine structure) being captured by DINOv2 but less
+saliently than gender or expression.
+\emph{Attractive} shows the smallest improvement. The attribute is
+subjectively defined and inconsistently grounded in low-level visual features,
+so the DINOv2 teacher provides a weaker alignment signal and the representational
+gain is correspondingly smaller.
+
+This hierarchy reflects a fundamental property of the REPA framework: it can
+only transfer structure that the self-supervised teacher itself encodes. The
+LDA separability of DINOv2 features with respect to each attribute therefore
+acts as an upper bound on the representational gain that REPA can deliver.
+
+\paragraph{Key Takeaways.}
+
+CelebA images are spatially homogeneous (face centred, consistent scale), and the
+class conditioning is injected at every transformer block via adaptive layer
+normalisation, making all 16 class labels trivially linearly decodable from
+even the earliest hidden states in both models. The
+PCA visualisations serve as the primary evidence for representational
+quality, since they reveal the \emph{spatial organisation} of features rather
+than their mere linear separability.
+
+The key takeaway is that REPA forces the model to internalise
+semantically meaningful facial structure earlier in the network and more
+robustly under noise, even though the generation objective alone would not
+require it on a spatially homogeneous dataset like CelebA.
 
 \subsubsection{VOVA, attribute direction vectors analysis, appendix C}
 
