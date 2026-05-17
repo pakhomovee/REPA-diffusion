@@ -530,7 +530,74 @@ semantically meaningful facial structure earlier in the network and more
 robustly under noise, even though the generation objective alone would not
 require it on a spatially homogeneous dataset like CelebA.
 
-\subsubsection{VOVA, attribute direction vectors analysis, appendix C}
+\subsubsection{Attribute Direction Vector Analysis}
+
+As a complementary probe, we analyse whether the trained generator contains
+approximately linear directions corresponding to CelebA attributes in its latent
+space. The goal is not only to check whether attributes are class-conditionally
+decodable, but whether moving along a learned direction produces a controlled
+semantic change in generated images.
+
+For each target attribute
+$a \in \{\text{Male}, \text{Smiling}, \text{Young}, \text{Attractive}\}$, we
+construct matched class pairs $(c_k^{+}, c_k^{-})$ that differ only in attribute
+$a$ while keeping the other three conditioning attributes fixed. For every pair,
+we sample the same initial Gaussian latent and generate two final VAE latents,
+one conditioned on $c_k^{+}$ and one conditioned on $c_k^{-}$. This produces two
+sets of generated latents, $\{z_i^{+}\}$ and $\{z_i^{-}\}$, where the comparison
+is controlled for the random seed and for all non-target attributes.
+
+We then flatten each latent and learn an attribute direction using
+ridge-regularised linear regression. Let $x_i=\operatorname{vec}(z_i)$ and
+$y_i \in \{+1,-1\}$ denote whether the latent was generated with the positive or
+negative value of the target attribute. We fit a linear score
+\[
+  s_a(x) = w_a^\top (x - \bar{x})
+\]
+by minimizing
+\[
+  \sum_i \left(w_a^\top (x_i-\bar{x}) - y_i\right)^2
+  + \lambda \|w_a\|_2^2 .
+\]
+The resulting vector $w_a$ is orthogonal to the learned separating hyperplane,
+so it gives the direction in latent space that most strongly separates the two
+attribute values under this linear model. We normalise this vector and rescale it
+to match the typical distance between matched positive and negative latent pairs.
+
+Finally, we test whether this direction is semantically meaningful by editing
+generated latents directly. Given a base generated latent $z$, we form
+\[
+  z(\alpha) = z + \alpha d_a,
+\]
+where $d_a$ is the normalised attribute direction and $\alpha$ is a scalar sweep
+coefficient. Decoding $z(\alpha)$ with the VAE gives an image sequence in which
+only the target attribute should change if the direction is well isolated.
+Figure~\ref{fig:young_direction_sweep} shows this procedure for the
+\emph{Young} attribute. Both the baseline and REPA models produce coherent
+age-related changes as $\alpha$ is varied, indicating that both generators manage
+to encode this attribute as an approximately linear vector direction in latent
+space. 
+
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/young_base.png}
+    \caption{Baseline}
+    \label{fig:young_direction_base}
+  \end{subfigure}
+  \vspace{0.4em}
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/young_repa.png}
+    \caption{REPA}
+    \label{fig:young_direction_repa}
+  \end{subfigure}
+  \caption{Latent-space sweeps along the learned \emph{Young} attribute
+  direction. Columns correspond to increasing coefficients $\alpha$ in
+  $z(\alpha)=z+\alpha d_{\mathrm{Young}}$.}
+  \label{fig:young_direction_sweep}
+\end{figure}
 
 \section{Future work}
 
