@@ -351,19 +351,21 @@ Figure~\ref{fig:old_nn} displays the five most similar pairs (generated image an
 its nearest training neighbour), where the visual resemblance is often
 indistinguishable.
 
-\begin{figure}[!htb]
+\begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{images/old_model_10_samples.png}
+  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/old_model_10_samples.png}
   \caption{Ten random generated images from the old model (depth 12, no augmentation) after 100k steps, CFG=4.0.}
   \label{fig:old_gen}
 \end{figure}
+\clearpage
 
-\begin{figure}[!htb]
+\begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{images/old_model_top5_nn.png}
+  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/old_model_top5_nn.png}
   \caption{Top‑5 most similar pairs (generated image vs. nearest training neighbour) for the old model.}
   \label{fig:old_nn}
 \end{figure}
+\clearpage
 
 \paragraph{Mitigated Model (Shallow + Flip).}
 
@@ -383,19 +385,21 @@ those from the old model. Figure~\ref{fig:new_nn} shows the five most similar
 pairs; the nearest training images are now clearly different in pose, lighting,
 or fine details — no exact copies appear.
 
-\begin{figure}[!htb]
+\begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{images/new_model_10_samples.png}
+  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/new_model_10_samples.png}
   \caption{Ten random generated images from the new model (depth 6, flip augmentation) after 100k steps, CFG=4.0.}
   \label{fig:new_gen}
 \end{figure}
+\clearpage
 
-\begin{figure}[!htb]
+\begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{images/new_model_top5_nn.png}
+  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/new_model_top5_nn.png}
   \caption{Top‑5 most similar pairs for the new model — no near‑copies are present.}
   \label{fig:new_nn}
 \end{figure}
+\clearpage
 
 \paragraph{Discussion.}
 
