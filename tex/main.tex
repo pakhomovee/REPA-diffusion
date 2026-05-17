@@ -432,7 +432,7 @@ as columns.
 
 \begin{figure}[h]
   \centering
-  %\includegraphics[width=\linewidth]{figure1.png}
+  %\includegraphics[width=\linewidth]{noise_layers.png}
   \caption{%
     PCA feature maps across all 12 transformer blocks and three noise levels.
     For each timestep group, rows show: the original CelebA image, the
@@ -442,34 +442,13 @@ as columns.
   \label{fig:pca_layers}
 \end{figure}
 
-In the \emph{Baseline} model, PCA maps remain largely unstructured through
-the first five to six blocks. Patches from visually distinct face regions --
-hair, skin, eyes, background -- are assigned similar colours, indicating that
-early token representations do not yet differentiate semantic content.
-Meaningful spatial organisation appears only in the final two or three blocks,
-and even there it is coarser than what REPA achieves.
+In both the \emph{Baseline} and \emph{REPA} models, semantic structure is already present in the early layers. From blocks~1--6 at $t = 0.5$ and $t = 0.7$, the PCA maps of both models show clear spatial partitioning: face, hair, and background regions are assigned distinct colour clusters. This is consistent with the observation made earlier that CelebA's spatial homogeneity makes basic face-region separation a low-effort task that both models learn readily.
 
-In the \emph{REPA} model, semantic structure emerges substantially earlier.
-Already by block~6, the PCA maps consistently partition the image into coherent
-face regions: a compact colour cluster for skin, a distinct cluster for hair,
-and a separate background region. This earlier formation is a direct consequence
-of representation alignment.
+The critical difference between the two models appears in blocks~7--9, where the Baseline maps collapse into spatially incoherent noise while the REPA maps maintain structured, interpretable regions. This mid-network collapse in the Baseline suggests that its intermediate representations undergo an unstructured transition between the early feature-building phase and the final velocity-prediction layers. REPA's alignment regularisation, acting at block~8, anchors this transition: instead of dissolving into noise, the representations remain semantically organised through the middle of the network.
 
-The timestep axis reveals the most striking contrast. At $t = 0.5$ (moderate
-noise) both models produce partially structured maps in the middle layers. At
-$t = 0.9$ (near-pure Gaussian noise) the Baseline maps collapse to spatially
-incoherent patterns at all but the deepest blocks, while REPA maps retain clear
-semantic region boundaries. This is particularly telling on CelebA: because all
-faces share nearly the same spatial layout, a model can recover coarse
-centre-face structure at high noise simply by memorising positional priors,
-without encoding any attribute-level content. The Baseline exploits this
-shortcut. REPA maps, anchored to DINOv2 features that encode attribute-level
-content, maintain finer internal structure -- skin, hair boundary, eye region
--- even when the noisy input carries almost no pixel-level signal.
+The timestep axis amplifies this contrast sharply. At $t = 0.9$ (near-pure Gaussian noise) the Baseline maps are largely uniform and flat from block~3 onward, recovering only a faint spatial gradient in the final blocks. REPA maps at $t = 0.9$, by contrast, retain a coherent face-background separation throughout most of the network depth, with the characteristic face-centred blob clearly visible even in layers 5--8. This confirms that REPA does not merely reorganise representations that the Baseline would form anyway --- it builds representations that are fundamentally more robust to the destruction of pixel-level signal.
 
-To conclude, Representation Alignment enables the model to learn coherent, meaningful features
-on early layers as well as makes these features more robust and stable so that
-they can be reliably extracted even from pictures with low pixel-level signal. 
+To summarise, Representation Alignment produces two distinct effects visible in this figure: it \emph{stabilises} the mid-network transition that causes blocks~7--9 to collapse in the Baseline, and it makes the resulting representations \emph{noise-robust}, preserving semantic structure at timesteps where the Baseline loses it entirely. 
 
 \paragraph{Attribute-Specific Separability.}
 
@@ -499,7 +478,7 @@ Baseline:
 
 \begin{figure}[h]
   \centering
-  %\includegraphics[width=\linewidth]{figure2.png}
+  %\includegraphics[width=\linewidth]{attribute_separation.png}
   \caption{%
     Attribute-specific feature map separability at block~8 and $t = 0.5$.
     The figure is arranged as a $2{\times}2$ grid of attribute panels
