@@ -44,7 +44,7 @@ accelerate launch \
   --learning-rate=1e-4 \
   --adam-weight-decay=0.05 \
   --max-grad-norm=1.0 \
-  --max-train-steps=50000 \
+  --max-train-steps=30000 \
   --checkpointing-steps=10000 \
   --sampling-steps=10000 \
   --num-workers=2 \
