@@ -118,7 +118,19 @@ repa_diffusion/
 │   ├── start_tensorboard.sh                    ← TensorBoard launcher
 │   ├── run_stanford_cars_baseline.sh           ← Stanford Cars baseline
 │   ├── run_stanford_cars_repa.sh               ← Stanford Cars REPA
-│   └── export_stanford_cars_for_repa.py        ← HF → REPA dataset export
+│   ├── export_stanford_cars_for_repa.py        ← HF → REPA dataset export
+│   ├── celeba.py                               ← CelebA Dataset class
+│   ├── export_celeba_for_repa.py               ← CelebA → REPA dataset export
+│   ├── run_celeba_baseline.sh                  ← CelebA baseline training
+│   ├── run_celeba_repa.sh                      ← CelebA REPA training
+│   ├── lsunchurch.py                           ← LSUN Church Dataset class
+│   ├── export_lsunchurch_for_repa.py           ← LSUN Church → REPA dataset export
+│   ├── run_lsunchurch_baseline.sh              ← LSUN Church baseline training
+│   ├── run_lsunchurch_repa.sh                  ← LSUN Church REPA training
+│   ├── compcars.py                             ← CompCars Dataset class
+│   ├── export_compcars_for_repa.py             ← CompCars → REPA dataset export
+│   ├── run_compcars_baseline.sh                ← CompCars baseline training
+│   └── run_compcars_repa.sh                    ← CompCars REPA training
 │
 ├── logs/                            ← stdout training logs (gitignored)
 │   ├── train_baseline_30k_gpus0-3.log
@@ -266,98 +278,25 @@ EXP_NAME=imagenette_repa_1gpu \
 ./scripts/run_imagenette_repa_1gpu.sh > logs/train_repa_1gpu.log 2>&1
 ```
 
-If you get OOM errors reduce `LOCAL_BATCH` and increase `ACCUM_STEPS` proportionally:
+If you get OOM errors reduce `LOCAL_BATCH` and increase `ACCUM_STEPS` proportionally.
+
+### 4. Sampling
 
 ```bash
-LOCAL_BATCH=8 ACCUM_STEPS=32 ./scripts/run_imagenette_repa_1gpu.sh
+bash scripts/generate_imagenette_samples.sh \
+  runs/imagenette_sit_b2_repa_100k/checkpoints/0100000.pt \
+  --cfg-scale 4 --num-sampling-steps 250
 ```
 
-### 4. Monitor Training
-
-**Watch progress (reads TensorBoard event files):**
+### 5. Monitor Training
 
 ```bash
-watch -n 30 ./scripts/show_imagenette_30k_progress.sh
-```
-
-**TensorBoard:**
-
-```bash
-BASELINE_EXP=imagenette_sit_b2_baseline_30k_gpus0-3 \
-REPA_EXP=imagenette_sit_b2_repa_dinov2b_30k_gpus4-7 \
 ./scripts/start_tensorboard.sh
 ```
 
-From a remote machine open an SSH tunnel and visit `http://localhost:6006`:
-
-```bash
-ssh -L 6006:127.0.0.1:6006 <server>
-```
-
-### 5. Generate Samples
-
-Use the labeled grid script which auto-detects baseline vs. REPA checkpoints:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 /path/to/python scripts/generate_labeled_imagenette_grid.py \
-  --ckpt runs/imagenette_sit_b2_repa_dinov2b_30k_gpus4-7/checkpoints/0100000.pt \
-  --out-dir samples/repa_100k_cfg4 \
-  --class-ids 0,1,2,3,4,5,6,7,8,9 \
-  --num-images 10 \
-  --num-steps 250 \
-  --mode ode \
-  --cfg-scale 4.0 \
-  --weights model
-```
-
-Key flags:
-- `--weights model` — use raw model weights (better than EMA at early checkpoints)
-- `--cfg-scale` — guidance scale; 2–4 gives cleaner images but may show memorization
-- `--mode ode` — deterministic ODE sampler; `sde` is stochastic
-- `--class-ids` — fixed class sweep for reproducible comparisons
-
-### 6. Memorization Audit
-
-Run the pixel-MSE nearest-neighbour notebook to check whether generated images are near-copies of training images:
-
-```bash
-jupyter notebook nearest_train_image_audit.ipynb
-```
-
-Set the constants at the top:
-
-```python
-GENERATED_DIR = "samples/repa_100k_cfg4"
-TRAIN_IMAGES_DIR = "data/imagenette256-train/images"
-REPORT_DIR = "reports/nearest_train_pixel_audit/repa_100k_cfg4"
-```
-
 ---
 
-## Scientific Configuration
-
-All experiments use paper-faithful SiT-B/2 hyperparameters:
-
-| Parameter | Value |
-|---|---|
-| Model | SiT-B/2 |
-| Resolution | 256×256 (latent 32×32×4) |
-| Path type | linear |
-| Prediction target | v |
-| Weighting | uniform |
-| Optimizer | AdamW |
-| Learning rate | 1e-4 |
-| Betas | (0.9, 0.999) |
-| Weight decay | 0 |
-| Precision | fp16, TF32 enabled |
-| Global batch | 256 |
-| REPA teacher | DINOv2-ViT-B |
-| REPA proj coeff | 0.5 |
-| REPA encoder depth | 4 |
-
----
-
-## REPA Submodule Changes
+## Forked REPA: Patches Applied
 
 The `REPA/` submodule is a fork of [sihyun-yu/REPA](https://github.com/sihyun-yu/REPA) with the following project-specific patches:
 
@@ -502,6 +441,211 @@ NUM_CLASSES=8 bash scripts/run_celeba_repa.sh   # e.g. 3 attributes -> 2^3=8
 
 ---
 
+## LSUN Church Dataset
+
+LSUN Church-Outdoor is a large-scale **unconditional** scene generation benchmark. Since it carries no semantic class labels, it is exported with a single class (`--num-classes=1`), making it an ideal test bed for studying whether REPA's representation alignment improves sample quality on natural-scene data without class conditioning.
+
+Kaggle source: [ajaykgp12/lsunchurch](https://www.kaggle.com/datasets/ajaykgp12/lsunchurch)
+
+### Prerequisites
+
+```bash
+pip install kagglehub natsort   # kagglehub enables auto-download
+```
+
+### Step 1 — Export LSUN Church images
+
+```bash
+python scripts/export_lsunchurch_for_repa.py
+```
+
+This creates `data/lsun_church256/images/` (256×256 centre-cropped JPEGs) and `data/lsun_church256/dataset.json`.
+
+**Optional overrides:**
+```bash
+python scripts/export_lsunchurch_for_repa.py \
+  --root-dir  data/lsun_church \
+  --output-dir data/lsun_church256 \
+  --resolution 256 \
+  --max-images 50000   # cap export for quick tests
+```
+
+> If Kaggle credentials are configured, `LSUNChurchDataset` will auto-download via `kagglehub`.  
+> Otherwise, download the dataset manually and extract it into `data/lsun_church/`.
+
+### Step 2 — Encode VAE latents
+
+```bash
+cd REPA/preprocessing
+python dataset_tools.py encode \
+    --source ../../data/lsun_church256 \
+    --dest ../../data/lsun_church256/vae-sd \
+    --model-url stabilityai/sd-vae-ft-mse
+cd ../..
+```
+
+Expected output layout:
+```
+data/lsun_church256/
+    images/          <- 256×256 JPEGs
+    vae-sd/          <- .npy latents + dataset.json
+    dataset.json     <- all labels = 0 (unconditional)
+```
+
+### Step 3 — Training
+
+**Baseline (no REPA alignment):**
+```bash
+bash scripts/run_lsunchurch_baseline.sh
+```
+
+**REPA with DINOv2-B encoder:**
+```bash
+bash scripts/run_lsunchurch_repa.sh
+```
+
+Both scripts default to 6 GPUs (`CUDA_VISIBLE_DEVICES=0,1,2,3,4,5`). Override via environment variables:
+```bash
+NUM_PROCESSES=2 \
+CUDA_VISIBLE_DEVICES=0,1 \
+BATCH_SIZE=128 \
+MAX_TRAIN_STEPS=50000 \
+CHECKPOINTING_STEPS=5000 \
+EXP_NAME=lsunchurch_test \
+bash scripts/run_lsunchurch_repa.sh
+```
+
+### Step 4 — Monitor
+```bash
+./scripts/start_tensorboard.sh
+```
+
+### LSUN Church Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Model | SiT-B/2 |
+| Resolution | 256×256 |
+| Num classes | 1 (unconditional) |
+| REPA teacher | DINOv2-ViT-B |
+| REPA proj coeff | 0.5 |
+| Default max steps | 100 000 |
+| Accelerate port (baseline) | 29523 |
+| Accelerate port (REPA) | 29524 |
+
+---
+
+## CompCars Dataset
+
+CompCars (web-nature sub-set) contains fine-grained car images organized by **make** and **model**, making it a natural counterpart to Stanford Cars for studying REPA on fine-grained recognition tasks. Classes are assigned at the **(make × model)** level; with the default `--min-class-size=10` filter approximately **1 600 classes** survive, giving a much richer conditioning signal than Stanford Cars (196 classes).
+
+Kaggle source: [renancostaalencar/compcars](https://www.kaggle.com/datasets/renancostaalencar/compcars)
+
+### Prerequisites
+
+```bash
+pip install kagglehub natsort
+```
+
+### Step 1 — Export CompCars images
+
+```bash
+python scripts/export_compcars_for_repa.py
+```
+
+The script prints the final `--num-classes` value — **note it down** and use it in Steps 3–4.
+
+**Optional overrides:**
+```bash
+python scripts/export_compcars_for_repa.py \
+  --root-dir  data/compcars \
+  --output-dir data/compcars256 \
+  --resolution 256 \
+  --min-class-size 10   # drop classes with fewer than 10 images; set to 1 to keep all
+```
+
+> The `--min-class-size` filter removes very rare make/model combinations that would be impossible to learn. Increase it to reduce class count; set to `1` to keep every class.
+
+Output layout:
+```
+data/compcars256/
+    000-<make>_<model>/
+        000000.jpg
+        000001.jpg
+        ...
+    001-<make>_<model>/
+        ...
+    dataset.json    <- {"labels": [["000-…/000000.jpg", 0], ...]}
+    classes.json    <- {0: "<make>_<model>", 1: ..., ...}
+```
+
+### Step 2 — Encode VAE latents
+
+```bash
+cd REPA/preprocessing
+python dataset_tools.py encode \
+    --source ../../data/compcars256 \
+    --dest ../../data/compcars256/vae-sd \
+    --model-url stabilityai/sd-vae-ft-mse
+cd ../..
+```
+
+### Step 3 — Training
+
+**Baseline (no REPA alignment):**
+```bash
+NUM_CLASSES=<value from Step 1> bash scripts/run_compcars_baseline.sh
+```
+
+**REPA with DINOv2-B encoder:**
+```bash
+NUM_CLASSES=<value from Step 1> bash scripts/run_compcars_repa.sh
+```
+
+Both scripts default to 6 GPUs and `NUM_CLASSES=1600`. Override as needed:
+```bash
+NUM_PROCESSES=2 \
+CUDA_VISIBLE_DEVICES=0,1 \
+NUM_CLASSES=1712 \
+BATCH_SIZE=128 \
+MAX_TRAIN_STEPS=50000 \
+CHECKPOINTING_STEPS=5000 \
+EXP_NAME=compcars_test \
+bash scripts/run_compcars_repa.sh
+```
+
+### Step 4 — Monitor
+```bash
+./scripts/start_tensorboard.sh
+```
+
+### CompCars Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Model | SiT-B/2 |
+| Resolution | 256×256 |
+| Class granularity | make × model |
+| Num classes (default filter) | ~1 600 (with `--min-class-size=10`) |
+| REPA teacher | DINOv2-ViT-B |
+| REPA proj coeff | 0.5 |
+| Default max steps | 100 000 |
+| Accelerate port (baseline) | 29525 |
+| Accelerate port (REPA) | 29526 |
+
+---
+
+## Dataset Overview
+
+| Dataset | Images | Classes | Class type | Source |
+|---|---|---|---|---|
+| Imagenette | ~9 469 | 10 | Object category | fast.ai |
+| Stanford Cars | ~16 185 | 196 | Car make/model/year | Hugging Face |
+| CelebA | 202 599 | 16 (default) | Attribute bitmask | Google Drive |
+| LSUN Church | ~126 000 | 1 | Unconditional | Kaggle |
+| CompCars | ~130 000 | ~1 600 | Car make/model | Kaggle |
+
+---
 
 ## Links
 
