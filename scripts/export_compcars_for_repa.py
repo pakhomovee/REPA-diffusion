@@ -3,17 +3,29 @@
 
 Kaggle dataset: https://www.kaggle.com/datasets/renancostaalencar/compcars
 
-The output structure expected by REPA preprocessing (dataset_tools.py) is:
-    <output_dir>/
-        <class_dir>/          e.g. 000-honda_civic/
-            000000.jpg
-            000001.jpg
-            ...
-        dataset.json          <- {"labels": [["<class_dir>/000000.jpg", <class_id>], ...]}
+Expected on-disk layout of the downloaded archive:
+    <root_dir>/
+        image/
+            <make_id>/
+                <model_id>/
+                    <year>/
+                        *.jpg
+        label/
+        misc/
+        train_test_split/
 
-Classes are defined at the make × model level (same granularity as the
-Stanford Cars split in this repo).  Pass the printed --num-classes value
-to the training scripts.
+The script locates the 'image/' directory automatically regardless of where
+exactly the archive was extracted.
+
+Output structure (REPA image-folder format):
+    <output_dir>/
+        000-make1_model10/
+            000000.jpg
+            ...
+        001-make1_model11/
+            ...
+        dataset.json     <- {"labels": [["000-.../000000.jpg", class_id], ...]}
+        classes.json     <- {class_id: "make{X}_model{Y}", ...}
 
 After running this script, encode VAE latents with:
     cd REPA/preprocessing
@@ -29,8 +41,10 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
+from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -53,52 +67,54 @@ def export_compcars(
     resolution: int,
     min_class_size: int,
 ) -> None:
-    transform = transforms.Compose([
+    resize = transforms.Compose([
         transforms.Resize(resolution, interpolation=transforms.InterpolationMode.LANCZOS),
         transforms.CenterCrop(resolution),
     ])
 
-    dataset = CompCarsDataset(root_dir=str(root_dir), transform=transform)
+    # Load dataset WITHOUT transform so we can filter first, then resize on export
+    dataset = CompCarsDataset(root_dir=str(root_dir), transform=None)
+    print(f"Found {len(dataset)} images across {dataset.num_classes} classes before filtering.")
 
-    # Optional: drop tiny classes (reduces noise from rare models)
+    # Filter classes below min_class_size
     if min_class_size > 1:
-        from collections import Counter
         counts = Counter(class_id for _, class_id in dataset.samples)
-        kept_ids = {cid for cid, cnt in counts.items() if cnt >= min_class_size}
-        # Remap to contiguous ids
-        old_to_new = {old: new for new, old in enumerate(sorted(kept_ids))}
+        kept_ids = sorted(cid for cid, cnt in counts.items() if cnt >= min_class_size)
+        old_to_new = {old: new for new, old in enumerate(kept_ids)}
         dataset.samples = [
-            (p, old_to_new[cid]) for p, cid in dataset.samples if cid in kept_ids
+            (p, old_to_new[cid]) for p, cid in dataset.samples if cid in old_to_new
         ]
-        dataset.classes = [dataset.classes[old] for old in sorted(kept_ids)]
+        dataset.classes = [dataset.classes[old] for old in kept_ids]
         print(
-            f"Kept {len(dataset.classes)} classes with >= {min_class_size} images "
-            f"({len(dataset)} samples total)."
+            f"After --min-class-size={min_class_size}: "
+            f"{len(dataset.classes)} classes, {len(dataset.samples)} images."
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Pre-create class directories
+    class_dirs = {}
     for class_id, class_name in enumerate(dataset.classes):
-        (output_dir / f"{class_id:03d}-{slugify(class_name)}").mkdir(
-            parents=True, exist_ok=True
-        )
+        cdir = output_dir / f"{class_id:03d}-{slugify(class_name)}"
+        cdir.mkdir(parents=True, exist_ok=True)
+        class_dirs[class_id] = cdir
 
     labels: list[list] = []
     class_counters: dict[int, int] = {}
 
     for img_path, class_id in tqdm(dataset.samples, desc="Exporting CompCars"):
-        class_name = dataset.classes[class_id]
-        class_dir = f"{class_id:03d}-{slugify(class_name)}"
         img_idx = class_counters.get(class_id, 0)
         class_counters[class_id] = img_idx + 1
-        rel_path = f"{class_dir}/{img_idx:06d}.jpg"
+
+        class_dir = class_dirs[class_id]
+        rel_path = f"{class_dir.name}/{img_idx:06d}.jpg"
         out_path = output_dir / rel_path
+
         if not out_path.exists():
-            img = dataset.transform(
-                __import__("PIL").Image.open(img_path).convert("RGB")
-            ) if dataset.transform else __import__("PIL").Image.open(img_path).convert("RGB")
+            img = Image.open(img_path).convert("RGB")
+            img = resize(img)
             img.save(out_path, quality=95)
+
         labels.append([rel_path, class_id])
 
     dataset_json_path = output_dir / "dataset.json"
@@ -112,10 +128,10 @@ def export_compcars(
         )
 
     num_classes = len(dataset.classes)
-    print(f"Exported {len(labels)} images to {output_dir}")
+    print(f"\nExported {len(labels)} images → {output_dir}")
     print(f"Number of classes: {num_classes}  (make × model)")
-    print(f"dataset.json   -> {dataset_json_path}")
-    print(f"classes.json   -> {classes_json_path}")
+    print(f"dataset.json  → {dataset_json_path}")
+    print(f"classes.json  → {classes_json_path}")
     print()
     print("Next step – encode VAE latents:")
     print(
@@ -139,7 +155,11 @@ def main() -> None:
         "--root-dir",
         type=Path,
         default=Path(os.environ.get("REPA_ROOT", _repo_root)) / "data" / "compcars",
-        help="Root directory containing (or receiving) the Kaggle dataset.",
+        help=(
+            "Root directory of the CompCars archive "
+            "(parent of the 'image/' folder). "
+            "Will attempt kagglehub auto-download if absent."
+        ),
     )
     parser.add_argument(
         "--output-dir",

@@ -1,5 +1,4 @@
 import os
-import re
 import zipfile
 from pathlib import Path
 
@@ -19,27 +18,24 @@ class CompCarsDataset(Dataset):
     Dataset class for the CompCars dataset sourced from Kaggle
     (renancostaalencar/compcars).
 
-    Expected on-disk layout (web-nature sub-set):
+    The Kaggle archive has the following layout:
         <root_dir>/
-            data/
-                image/
-                    <make_id>/
-                        <model_id>/
-                            <year>/
-                                *.jpg
-                label/
-                    <make_id>/
-                        <model_id>/
-                            <year>/
-                                *.txt   (optional)
+            image/                   ← top-level images folder
+                <make_id>/
+                    <model_id>/
+                        <year>/
+                            *.jpg
+            label/                   ← optional annotation files
+            misc/
+            train_test_split/
 
-    Class labels are assigned at the *make × model* level, so every
-    distinct (make_id, model_id) pair gets a unique integer class id.
-    This gives fine-grained car model conditioning comparable to the
-    Stanford Cars split used elsewhere in this repo.
+    Class labels are assigned at the make_id × model_id level.
+    Every distinct (make_id, model_id) pair gets a unique integer class id,
+    giving fine-grained car-model conditioning.
 
     Args:
         root_dir (str): Directory containing (or receiving) the dataset.
+                        This should be the parent of the 'image/' folder.
         transform (callable, optional): Transform applied to each PIL Image.
     """
 
@@ -51,7 +47,7 @@ class CompCarsDataset(Dataset):
         self.root_dir = root_dir
         self.transform = transform
 
-        image_root = self._locate_or_download()
+        image_root = self._locate_image_root()
         self.samples, self.class_to_idx, self.classes = self._build_index(image_root)
         if not self.samples:
             raise RuntimeError(
@@ -61,41 +57,72 @@ class CompCarsDataset(Dataset):
             )
 
     # ------------------------------------------------------------------
-    def _locate_or_download(self) -> str:
+    def _locate_image_root(self) -> str:
+        """
+        Find the directory whose immediate children are numeric make_id
+        folders (e.g. 1/, 10/, 100/, ...).
+
+        The Kaggle archive extracts to:
+            <root_dir>/image/<make_id>/<model_id>/<year>/*.jpg
+
+        We locate the 'image/' directory by looking for a folder whose
+        children are all (or mostly) numeric directory names.
+        """
         root = Path(self.root_dir)
         root.mkdir(parents=True, exist_ok=True)
 
-        # Preferred: data/image sub-tree
-        candidate = root / "data" / "image"
-        if candidate.is_dir():
-            return str(candidate)
+        # Helper: does a directory look like the make-level root?
+        # We consider it a match if ≥80% of its sub-entries are numeric dirs.
+        def is_make_root(p: Path) -> bool:
+            try:
+                children = [c for c in p.iterdir() if c.is_dir()]
+                if not children:
+                    return False
+                numeric = sum(1 for c in children if c.name.isdigit())
+                return numeric / len(children) >= 0.8
+            except PermissionError:
+                return False
 
-        # Flat fallback: root itself or any sub-dir containing images
-        for dirpath, dirnames, fnames in os.walk(root):
-            # Skip annotation/label directories
-            if "label" in dirpath or "annotation" in dirpath:
+        # 1) Common known paths
+        for candidate in [
+            root / "image",
+            root / "data" / "image",
+            root,
+        ]:
+            if candidate.is_dir() and is_make_root(candidate):
+                print(f"CompCars image root: {candidate}")
+                return str(candidate)
+
+        # 2) BFS over root to find the make-level directory
+        for dirpath_str, dirnames, _ in os.walk(str(root)):
+            dirpath = Path(dirpath_str)
+            # Skip annotation / label directories
+            if any(part in {"label", "annotation", "misc", "train_test_split"}
+                   for part in dirpath.parts):
+                dirnames[:] = []
                 continue
-            if any(Path(f).suffix.lower() in self._IMAGE_EXTS for f in fnames):
-                # Walk up to the highest directory that looks like make/model layout
-                return dirpath
+            if is_make_root(dirpath):
+                print(f"CompCars image root (found by walk): {dirpath}")
+                return str(dirpath)
 
-        # Extract any .zip found
+        # 3) Extract any .zip
         zips = list(root.glob("*.zip"))
         if zips:
             print(f"Extracting {zips[0]} ...")
             with zipfile.ZipFile(zips[0], "r") as z:
                 z.extractall(root)
-            return self._locate_or_download()
+            return self._locate_image_root()
 
-        # kagglehub fallback
+        # 4) kagglehub fallback
         try:
             import kagglehub  # type: ignore
             print(f"Downloading {self.KAGGLE_SLUG} via kagglehub ...")
-            path = kagglehub.dataset_download(self.KAGGLE_SLUG)
-            return path
+            dl_path = kagglehub.dataset_download(self.KAGGLE_SLUG)
+            self.root_dir = dl_path
+            return self._locate_image_root()
         except Exception as exc:
             raise RuntimeError(
-                f"Could not locate CompCars images in {root}.\n"
+                f"Could not locate CompCars 'image/' directory in {root}.\n"
                 "Download manually from "
                 f"https://www.kaggle.com/datasets/{self.KAGGLE_SLUG} "
                 f"and extract into {root}.\n"
@@ -105,36 +132,54 @@ class CompCarsDataset(Dataset):
     # ------------------------------------------------------------------
     def _build_index(self, image_root: str):
         """
-        Walk image_root and assign an integer class id to every
-        (make_id, model_id) pair.  Returns:
-            samples        : list of (abs_path, class_id)
-            class_to_idx   : dict  {(make_id, model_id): class_id}
-            classes        : list  of "(make_id)_(model_id)" strings
+        Walk image_root (the make-level directory) and collect
+        (image_path, make_id, model_id) triples.
+
+        Expected structure:
+            image_root/
+                <make_id>/        ← numeric string, e.g. "1"
+                    <model_id>/   ← numeric string, e.g. "10"
+                        <year>/   ← e.g. "2012"
+                            *.jpg
+
+        Returns:
+            samples      : list of (abs_path_str, class_id)
+            class_to_idx : dict {(make_id, model_id): class_id}
+            classes      : list of "make{make_id}_model{model_id}" strings
         """
         root = Path(image_root)
-        # Collect all (make, model) pairs first for a stable class order
-        class_set: set[tuple[str, str]] = set()
-        all_images: list[tuple[Path, str, str]] = []
 
-        for img_path in SORTFN(str(p) for p in root.rglob("*")
-                               if p.is_file()
-                               and p.suffix.lower() in self._IMAGE_EXTS):
+        class_set: set[tuple[str, str]] = set()
+        raw: list[tuple[Path, str, str]] = []  # (path, make_id, model_id)
+
+        for img_path in SORTFN(
+            str(p) for p in root.rglob("*")
+            if p.is_file() and p.suffix.lower() in self._IMAGE_EXTS
+        ):
             p = Path(img_path)
-            parts = p.relative_to(root).parts
-            if len(parts) >= 2:
-                make_id, model_id = parts[0], parts[1]
-            else:
+            try:
+                rel_parts = p.relative_to(root).parts
+                # rel_parts = (make_id, model_id, year, filename)
+                #              or (make_id, model_id, filename) if no year level
+                if len(rel_parts) >= 2:
+                    make_id = rel_parts[0]
+                    model_id = rel_parts[1]
+                else:
+                    make_id = rel_parts[0] if rel_parts else "unknown"
+                    model_id = "unknown"
+            except ValueError:
                 make_id, model_id = "unknown", "unknown"
+
             class_set.add((make_id, model_id))
-            all_images.append((p, make_id, model_id))
+            raw.append((p, make_id, model_id))
 
         sorted_classes = sorted(class_set)
         class_to_idx = {cls: idx for idx, cls in enumerate(sorted_classes)}
-        classes = [f"{m}_{mo}" for m, mo in sorted_classes]
+        classes = [f"make{m}_model{mo}" for m, mo in sorted_classes]
 
         samples = [
             (str(p), class_to_idx[(make, model)])
-            for p, make, model in all_images
+            for p, make, model in raw
         ]
         return samples, class_to_idx, classes
 

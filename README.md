@@ -296,9 +296,130 @@ bash scripts/generate_imagenette_samples.sh \
 
 ---
 
+## Parallel VAE Encoding
+
+By default the REPA preprocessing script runs on a single GPU with a batch size of 1, which is a significant bottleneck for large datasets (CelebA, LSUN Church, CompCars).  The patched `dataset_tools.py` in this repository removes both limitations.
+
+### What changed in `dataset_tools.py`
+
+| Change | Detail |
+|---|---|
+| `--batch-size` (default 8) | VAE processes a batch of images per forward pass instead of one at a time |
+| `--device cuda:N` | Explicit GPU selection so workers don't fight over the same device |
+| `--rank / --world-size` | Each worker handles indices `global_idx % world_size == rank`, writing to its own `shard_RRRR_of_WWWW/` sub-directory |
+| Removed `WORLD_SIZE != 1` guard | Script can now be launched from a plain shell loop without `torchrun` |
+
+### How to encode on multiple GPUs
+
+Run one process per GPU in the background, then merge:
+
+```bash
+cd REPA/preprocessing
+NUM_GPUS=4
+
+for i in $(seq 0 $((NUM_GPUS - 1))); do
+    python dataset_tools.py encode \
+        --source ../data/celeba256 \
+        --dest   ../data/celeba256/vae-sd \
+        --model-url stabilityai/sd-vae-ft-mse \
+        --batch-size 16 \
+        --device "cuda:$i" \
+        --rank "$i" \
+        --world-size "$NUM_GPUS" &
+done
+wait
+
+# Merge shard directories + combine dataset.json files
+python ../scripts/merge_vae_shards.py \
+    --dest ../data/celeba256/vae-sd \
+    --world-size "$NUM_GPUS"
+```
+
+Expected throughput improvement vs. the upstream single-GPU / batch-size-1 baseline:
+
+| Config | Relative speed |
+|---|---|
+| 1 GPU, batch 1 (upstream default) | 1× |
+| 1 GPU, batch 16 | ~12–15× |
+| 4 GPUs, batch 16 each | ~45–55× |
+| 8 GPUs, batch 16 each | ~85–100× |
+
+> These are approximate; actual speedup depends on GPU model, image resolution, and storage I/O.
+
+### `merge_vae_shards.py`
+
+After all worker processes finish, each shard directory contains `.npy` latents and its own `dataset.json`.  `merge_vae_shards.py` moves all `.npy` files into the parent `vae-sd/` directory, sorts and concatenates the label lists, writes a single `dataset.json`, and (by default) removes the shard sub-directories.
+
+```bash
+python scripts/merge_vae_shards.py \
+    --dest data/celeba256/vae-sd \
+    --world-size 4      # must match --world-size used during encoding
+    [--keep-shards]     # omit to keep shard directories for debugging
+```
+
+---
+
+## End-to-End Pipeline Scripts
+
+Each dataset has a single script that runs the full pipeline in order:
+1. Export / download images
+2. Encode VAE latents (multi-GPU)
+3. Train baseline and REPA
+
+### Imagenette
+
+```bash
+# defaults: 4 encode GPUs, 100k train steps
+bash scripts/pipeline_imagenette.sh
+
+# custom overrides
+NUM_ENCODE_GPUS=2 \
+ENCODE_BATCH_SIZE=32 \
+MAX_TRAIN_STEPS=30000 \
+bash scripts/pipeline_imagenette.sh
+```
+
+### CelebA
+
+```bash
+bash scripts/pipeline_celeba.sh
+
+# custom attributes (adjusts NUM_CLASSES automatically)
+SELECTED_ATTRS="Male Smiling Young" \
+NUM_ENCODE_GPUS=4 \
+bash scripts/pipeline_celeba.sh
+```
+
+### LSUN Church
+
+Download `church_outdoor_train_lmdb_color_64.npy` from [Kaggle](https://www.kaggle.com/datasets/ajaykgp12/lsunchurch) and place it in `data/lsun_church/`, then:
+
+```bash
+bash scripts/pipeline_lsunchurch.sh
+
+# quick test with 20k images
+MAX_IMAGES=20000 NUM_ENCODE_GPUS=2 bash scripts/pipeline_lsunchurch.sh
+```
+
+### CompCars
+
+Download from [Kaggle](https://www.kaggle.com/datasets/renancostaalencar/compcars) and extract to `data/compcars/`, then:
+
+```bash
+bash scripts/pipeline_compcars.sh
+
+# keep only classes with ≥20 images
+MIN_CLASS_SIZE=20 NUM_ENCODE_GPUS=4 bash scripts/pipeline_compcars.sh
+```
+
+The `NUM_CLASSES` value is read automatically from `classes.json` written by the export step, so you do not need to count or set it manually.
+
+---
+
 ## Forked REPA: Patches Applied
 
-The `REPA/` submodule is a fork of [sihyun-yu/REPA](https://github.com/sihyun-yu/REPA) with the following project-specific patches:
+The `REPA/` submodule is a fork of [sihyun-yu/REPA](https://github.com/sihyun-yu/REPA) with the following project-specific patches.
+The preprocessing script (`REPA/preprocessing/dataset_tools.py`) is replaced with a patched version from this repo's `scripts/` — copy it over before running any pipeline:
 
 | Change | File(s) |
 |---|---|
