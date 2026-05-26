@@ -447,6 +447,12 @@ LSUN Church-Outdoor is a large-scale **unconditional** scene generation benchmar
 
 Kaggle source: [ajaykgp12/lsunchurch](https://www.kaggle.com/datasets/ajaykgp12/lsunchurch)
 
+> **Data format note:** The Kaggle archive contains a single NumPy file —  
+> `church_outdoor_train_lmdb_color_64.npy` — which packs all 126 227 images  
+> as a `(126227, 64, 64, 3)` uint8 array. The export script loads this file  
+> directly and upsamples each image from **64×64 → 256×256** (Lanczos) before  
+> saving as JPEG.
+
 ### Prerequisites
 
 ```bash
@@ -455,11 +461,16 @@ pip install kagglehub natsort   # kagglehub enables auto-download
 
 ### Step 1 — Export LSUN Church images
 
+Place `church_outdoor_train_lmdb_color_64.npy` inside `data/lsun_church/`
+(the script will also attempt an automatic download via `kagglehub` if the
+file is absent and Kaggle API credentials are configured):
+
 ```bash
 python scripts/export_lsunchurch_for_repa.py
 ```
 
-This creates `data/lsun_church256/images/` (256×256 centre-cropped JPEGs) and `data/lsun_church256/dataset.json`.
+This loads the `.npy` array, upsamples every frame to 256×256, saves them as
+`data/lsun_church256/images/*.jpg`, and writes `data/lsun_church256/dataset.json`.
 
 **Optional overrides:**
 ```bash
@@ -467,11 +478,11 @@ python scripts/export_lsunchurch_for_repa.py \
   --root-dir  data/lsun_church \
   --output-dir data/lsun_church256 \
   --resolution 256 \
-  --max-images 50000   # cap export for quick tests
+  --max-images 50000   # cap export for quick smoke-tests
 ```
 
-> If Kaggle credentials are configured, `LSUNChurchDataset` will auto-download via `kagglehub`.  
-> Otherwise, download the dataset manually and extract it into `data/lsun_church/`.
+> Source images are 64×64 px; Lanczos upsampling is used to reach the target
+> resolution. For best quality keep `--resolution 256` (4× upsample).
 
 ### Step 2 — Encode VAE latents
 
@@ -642,7 +653,7 @@ bash scripts/run_compcars_repa.sh
 | Imagenette | ~9 469 | 10 | Object category | fast.ai |
 | Stanford Cars | ~16 185 | 196 | Car make/model/year | Hugging Face |
 | CelebA | 202 599 | 16 (default) | Attribute bitmask | Google Drive |
-| LSUN Church | ~126 000 | 1 | Unconditional | Kaggle |
+| LSUN Church | 126 227 | 1 | Unconditional (64×64 → 256×256) | Kaggle |
 | CompCars | ~130 000 | ~1 600 | Car make/model | Kaggle |
 
 ---

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Export LSUN Church images from Kaggle to REPA-compatible image folders.
+"""Export LSUN Church images from Kaggle .npy to REPA-compatible image folders.
 
 Kaggle dataset: https://www.kaggle.com/datasets/ajaykgp12/lsunchurch
+
+The Kaggle archive ships as a single NumPy file:
+    church_outdoor_train_lmdb_color_64.npy  —  shape (126227, 64, 64, 3), uint8
 
 The output structure expected by REPA preprocessing (dataset_tools.py) is:
     <output_dir>/
@@ -11,8 +14,9 @@ The output structure expected by REPA preprocessing (dataset_tools.py) is:
             ...
         dataset.json   <- {"labels": [["000000.jpg", 0], ...]}
 
-Because LSUN Church has no semantic classes the class id is always 0 and
-you should pass --num-classes=1 to the training scripts.
+Images are upsampled from 64×64 to --resolution (default 256) with Lanczos
+filtering.  Because LSUN Church has no semantic classes the class id is
+always 0 — pass --num-classes=1 to the training scripts.
 
 After running this script, encode VAE latents with:
     cd REPA/preprocessing
@@ -45,16 +49,17 @@ def export_lsunchurch(
     resolution: int,
     max_images: int | None,
 ) -> None:
-    images_dir = output_dir / "images"
-    images_dir.mkdir(parents=True, exist_ok=True)
-
-    transform = transforms.Compose([
-        transforms.Resize(resolution, interpolation=transforms.InterpolationMode.LANCZOS),
-        transforms.CenterCrop(resolution),
-    ])
+    # Upsample 64×64 → resolution×resolution with Lanczos
+    transform = transforms.Resize(
+        (resolution, resolution),
+        interpolation=transforms.InterpolationMode.LANCZOS,
+    )
 
     dataset = LSUNChurchDataset(root_dir=str(root_dir), transform=transform)
     total = len(dataset) if max_images is None else min(len(dataset), max_images)
+
+    images_dir = output_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
 
     labels: list[list] = []
     for idx in tqdm(range(total), desc="Exporting LSUN Church"):
@@ -69,8 +74,8 @@ def export_lsunchurch(
     with dataset_json_path.open("w") as f:
         json.dump({"labels": labels}, f)
 
-    print(f"Exported {len(labels)} images to {output_dir}")
-    print("Number of classes: 1  (unconditional – LSUN Church has no labels)")
+    print(f"\nExported {len(labels)} images ({resolution}×{resolution}) to {output_dir}")
+    print("Number of classes: 1  (unconditional — LSUN Church has no labels)")
     print(f"dataset.json written to {dataset_json_path}")
     print()
     print("Next step – encode VAE latents:")
@@ -89,13 +94,16 @@ def main() -> None:
     _repo_root = Path(__file__).resolve().parent.parent
 
     parser = argparse.ArgumentParser(
-        description="Export LSUN Church to REPA image-folder format."
+        description="Export LSUN Church (.npy) to REPA image-folder format."
     )
     parser.add_argument(
         "--root-dir",
         type=Path,
         default=Path(os.environ.get("REPA_ROOT", _repo_root)) / "data" / "lsun_church",
-        help="Root directory containing (or receiving) the Kaggle dataset.",
+        help=(
+            "Directory containing church_outdoor_train_lmdb_color_64.npy "
+            "(will attempt auto-download via kagglehub if absent)."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -107,14 +115,17 @@ def main() -> None:
         "--resolution",
         type=int,
         default=256,
-        help="Output image resolution (default: 256).",
+        help=(
+            "Output image resolution (default: 256). "
+            "Source images are 64×64 and will be upsampled with Lanczos."
+        ),
     )
     parser.add_argument(
         "--max-images",
         type=int,
         default=None,
         metavar="N",
-        help="Cap export to the first N images (useful for quick tests).",
+        help="Cap export to the first N images (useful for quick smoke-tests).",
     )
     args = parser.parse_args()
     export_lsunchurch(args.root_dir, args.output_dir, args.resolution, args.max_images)
