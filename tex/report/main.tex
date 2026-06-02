@@ -1,0 +1,46 @@
+\documentclass{article}
+
+\input{preamble}
+
+\title{Investigating the Impact of REPA Loss on Training Speed and Generation Quality in Diffusion Models}
+
+\author{%
+  Evgenii Pakhomov\\
+  HSE University\\
+  \And
+  Dmitrii Gromak \\
+  HSE University \\
+  \AND
+  Sergei Kopylov \\
+  HSE University \\
+  \And
+  Miron Makhlin \\
+  HSE University \\
+  \And
+  Vladimir Novikov\\
+  HSE University \\
+}
+
+\begin{document}
+\maketitle
+
+\input{sections/abstract}
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/task_setting}
+\input{sections/baseline_reproduction}
+\input{sections/repa_sigma}
+\input{sections/future_work}
+
+\newpage
+{\sloppy\printbibliography[heading=bibintoc]\par}
+
+\newpage
+
+\appendix
+
+\input{sections/appendix_memorization}
+\input{sections/appendix_feature_maps}
+
+\end{document}

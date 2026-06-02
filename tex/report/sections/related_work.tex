@@ -1,0 +1,15 @@
+\section{Related work}
+
+Early attempts to bring representation information into diffusion models were mostly indirect. One line of work sought to make diffusion models themselves stronger representation learners, for example by reformulating score matching for unsupervised representation learning, sharing generative and discriminative parameters in joint diffusion models, or imposing bottlenecks and denoising redesigns that encourage semantically meaningful features~\cite{mittal2024diffusionbasedrepresentationlearning,deja2023learning,Hudson_2024_CVPR,chen2024deconstructing}.
+
+Some researchers tried injecting external semantic representations through multi-stage pipelines rather than direct hidden-state matching: Wuerstchen~\cite{pernias2024wuerstchen} learns a compact semantic image latent that guides diffusion, while Representation-Conditioned Generation~\cite{li2024rcg} first generates self-supervised semantic codes and then conditions image synthesis on them.
+
+REPA differs by making alignment explicit inside a single diffusion model, matching noisy intermediate denoiser features to clean pretrained visual embeddings and using this match as an auxiliary training signal.
+
+iREPA further studies why some teacher encoders are more effective for representation alignment than others. Its main conclusion is that global semantic strength, such as classification accuracy, is not sufficient to explain the benefit of REPA. Instead, spatial structure in patch-level representations appears to be more important for image generation. This is especially relevant for our project, since fine-grained and narrow-domain datasets may require local details that are not well captured by a generic teacher encoder.
+
+Subsequent work has studied how this idea should be adapted across architectures rather than transferred unchanged. In particular, U-REPA~\cite{tian2025urepa} shows that moving REPA to diffusion U-Nets is nontrivial because skip connections, stage-specific block roles, and spatial downsampling make transformer-style tokenwise alignment less effective; to address this, it aligns middle-stage U-Net features, upsamples them after projection, and adds a manifold loss to better bridge U-Net and ViT feature spaces.
+
+REPA-E~\cite{leng2025repae} extends the same principle to end-to-end latent diffusion transformers by jointly tuning the VAE tokenizer and the diffusion model, showing that representation alignment can stabilize a setting where diffusion loss alone is ineffective.
+
+More recently, REPA-style alignment has also been adapted to masked diffusion language models~\cite{junior2026accelerating}, suggesting that representation alignment is evolving from a transformer-specific technique into a broader auxiliary training principle across generative architectures and even modalities.

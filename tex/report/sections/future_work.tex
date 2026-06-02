@@ -1,0 +1,18 @@
+\section{Future work}
+
+We plan to compare Representation Alignment across three single-domain datasets that span an explicit \emph{spatial}
+difficulty axis: human faces (CelebA), multi-region architectural scenes (LSUN Church), and rigid objects under large
+pose variation (Comprehensive Cars). CelebA is spatially homogeneous -- the face is centred and at a consistent scale,
+so region separation is a low-effort task (Section~\ref{sec:celeba}) that may understate REPA's benefit -- whereas
+Church and CompCars add multi-object scenes, perspective geometry, and viewpoint variation. This adjudicates between the
+two competing hypotheses of Section~\ref{sec:task_setting}: that harder domains leave more for the teacher to contribute
+(larger gains), or that the teacher's patch features are locally mismatched there (smaller or reversed gains). We sharpen
+this into a falsifiable prediction: since DINOv2 is trained on web-scale data where buildings and vehicles are heavily
+represented but tightly cropped faces are comparatively out of distribution, we expect its patch features to be more
+spatially informative on Church and CompCars, and thus predict larger, more localized REPA gains there than on CelebA.
+
+To keep ``domain'' from being entangled with ``dataset scale'', we will hold dataset size, compute, and teacher fixed
+across domains, and report FID/KID speedups, the gradient-compatibility curves of Section~\ref{sec:celeba}, and
+per-domain PCA feature maps. Finally, since REPA-$\Sigma$ (Section~\ref{sec:repa_sigma}) only acts when the alignment
+and diffusion gradients conflict, we will test whether this low-noise conflict -- and hence the gain from gradient
+surgery -- is itself domain-dependent, hypothesising it is strongest in the harder, more heterogeneous domains.
