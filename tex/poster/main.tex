@@ -35,8 +35,8 @@
 \setlength{\sepwidth}{0.025\paperwidth}
 \setlength{\colwidth}{0.3\paperwidth}
 \newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
-% QR links to the full report text (not the source repository).
-\newcommand{\reporturl}{https://pakhomovee.github.io/project.html?id=repa-diffusion}
+% Report not finished yet — QR target is a placeholder until the link exists.
+\newcommand{\reporturl}{TOBEDONE}
 \setbeamerfont{headline title}{size=\Large, series=\bfseries}
 
 % ── Placeholder boxes for not-yet-finished content ──────────────────────────
@@ -67,7 +67,7 @@
 \author{Evgenii Pakhomov, Dmitrii Gromak, Sergei Kopylov, Miron Makhlin, Vladimir Novikov}
 \institute[HSE]{HSE University \quad---\quad Methods of Optimization in Machine Learning}
 
-\footercontent{\href{mailto:evgenii.research@gmail.com}{evgenii.research@gmail.com} \hfill Course Project \hfill \url{\reporturl}}
+\footercontent{\hfill MOML course project \hfill}
 \logoright{\includegraphics[height=4.8cm]{hse_logo.pdf}}
 
 \begin{document}
@@ -119,7 +119,9 @@ denoiser $A$ while still using the alignment signal.
 \end{block}
 
 \begin{block}{Toy Experiments}
-\todobox{6.0cm}{\normalfont\upshape
+Experiments supporting the Toy Model results above --- empirically confirming that REPA-$\Sigma$ reaches the
+optimal denoiser $A$ while vanilla REPA stays biased.
+\todobox{5.2cm}{\normalfont\upshape
 (1) Diagonal-matrix model with an independent-features teacher --- closed-form convergence to $A$ under
 REPA-$\Sigma$ vs.\ biased REPA. \quad
 (2) MLP denoiser on MNIST/CIFAR trained with a REPA-style teacher matching our setting.}
@@ -133,7 +135,8 @@ REPA-$\Sigma$ vs.\ biased REPA. \quad
 \begin{column}{\colwidth}
 
 \begin{block}{Convergence across Three Datasets}
-Baseline / REPA / REPA-$\Sigma$ ($\pm\,\lambda$-anneal) on three single-domain datasets spanning a
+This section compares the impact of \textbf{REPA} vs.\ \textbf{REPA-$\Sigma$} ($\pm\,\lambda$-anneal), against the
+diffusion baseline, on convergence speed (FID/KID) across three single-domain datasets spanning a
 spatial-difficulty axis. On \textbf{CelebA}, surgery helps mid-training and $\lambda$-annealing late; combining
 both gives the best final FID.
 \begin{figure}
@@ -157,8 +160,9 @@ across all methods.}
 \begin{column}{\colwidth}
 
 \begin{block}{Feature Maps \& Generation across Three Datasets}
-PCA feature maps show REPA preserves semantic, face-centred structure through the mid-network and under heavy
-noise, where the baseline collapses. We extend the comparison to all three domains.
+This section compares the impact of \textbf{REPA} vs.\ \textbf{REPA-$\Sigma$} on the learned feature maps and
+generations across the three datasets. PCA maps show REPA preserves semantic, face-centred structure through the
+mid-network and under heavy noise, where the baseline collapses; we extend the comparison to all three domains.
 \begin{figure}
   \centering
   \includegraphics[width=0.62\linewidth]{noise_layers.png}
@@ -175,7 +179,7 @@ generation samples.}
 \begin{alertblock}{Full Report}
 \begin{center}
   \qrcode[height=1.5in]{\reporturl}\\[0.4ex]
-  {\small Scan for the full report}
+  {\small Full report --- link to be added}
 \end{center}
 \end{alertblock}
 
