@@ -1,0 +1,17 @@
+\begin{abstract}
+Diffusion models have emerged as the dominant paradigm for high-fidelity image generation, yet their training remains
+computationally expensive and slow to converge. Recent work introduced REPA (REPresentation Alignment), a regularization
+technique that aligns projections of noisy input hidden states in diffusion transformers with clean image representations
+from pretrained visual encoders. Reported as an ICLR 2025 Oral, REPA demonstrated substantial improvements in training
+efficiency, achieving up to 17.5x faster convergence on large-scale ImageNet experiments, while also
+improving final generation quality.
+In this project, we aim to present a partial reproduction and systematic extension of REPA under constrained computational settings.
+Rather than scaling to full ImageNet, we plan to reproduce the core REPA framework on reduced datasets and smaller model configurations, verifying
+its key claim of accelerated convergence relative to standard diffusion training. Building on this, we plan to investigate REPA in low-data
+regimes, considering both subsampled large-scale datasets (e.g., ImageNet) and naturally small, domain-specific datasets such as Stanford Cars.
+We will study three main questions: (1) whether REPA's improvements in convergence speed and sample quality persist when training data is
+limited; (2) how the choice of pretrained feature extractor -- comparing alternatives such as DINOv2 and CLIP -- affects performance,
+particularly in narrow visual domains; and (3) how sensitive REPA is to dataset scale, including whether its alignment objective can
+partially compensate for reduced data availability. Through these experiments, we aim to better characterize the practical benefits
+and limitations of representation alignment for efficient diffusion training in realistic, resource-constrained settings.
+\end{abstract}

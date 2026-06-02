@@ -1,0 +1,331 @@
+\section{Removing Gradient Conflict: REPA-\texorpdfstring{$\Sigma$}{Sigma}}
+\label{sec:repa_sigma}
+
+The gradient-compatibility analysis of Section~\ref{sec:celeba} motivates a simple intervention.
+We observed that the REPA gradient is well aligned with the diffusion gradient at high noise levels but becomes
+\emph{anticorrelated} at low noise levels and late in training (Figure~\ref{fig:grad_compat}). In that regime the
+auxiliary term actively pulls the update against the direction that decreases the diffusion loss, so a constant
+alignment weight $\lambda$ eventually does more harm than good. Rather than switching the alignment loss off entirely,
+as proposed by~\cite{wang2025haste}, we keep the part of the REPA gradient that helps and discard only the part that
+conflicts. We call the resulting gradient adapter \emph{REPA-$\Sigma$}.
+
+\paragraph{The REPA-\texorpdfstring{$\Sigma$}{Sigma} adapter.}
+At a training step with weights $w$, let
+\[
+  g \;=\; \nabla_w \mathcal{L}_{\mathrm{diff}}, \qquad
+  r \;=\; \nabla_w \mathcal{L}_{\mathrm{REPA}}
+\]
+be the diffusion and REPA gradients. As a low-variance reference for the primary descent direction we use
+$\bar g$, an estimate of the diffusion gradient evaluated at the exponential-moving-average (EMA) weights $\bar w$
+that are already maintained for sampling. Vanilla REPA forms the update direction $g + \lambda r$. REPA-$\Sigma$ instead
+replaces $r$ with its conflict-free counterpart, removing only the component of $r$ that is \emph{anti}-aligned with
+$\bar g$:
+\begin{equation}
+  r^{\Sigma}
+  \;=\;
+  r \;-\; \frac{\big[\langle r, \bar g\rangle\big]_{-}}{\|\bar g\|_2^2}\,\bar g,
+  \qquad
+  [x]_{-} \;=\; \min(x, 0),
+  \label{eq:repa_sigma}
+\end{equation}
+and uses the update direction $u_{\Sigma} = g + \lambda\, r^{\Sigma}$. When $\langle r,\bar g\rangle \ge 0$ the bracket
+vanishes and $r^{\Sigma}=r$, so aligned REPA gradients pass through untouched. When $\langle r,\bar g\rangle < 0$ the
+adapter subtracts exactly the offending projection, leaving $r^{\Sigma}$ orthogonal to $\bar g$. The operation is
+parameter-free and adds only one inner product and one axpy per step.
+
+\subsection{General Theoretical Results}
+\label{sec:repa_sigma_theory}
+
+We formalise the two properties that make \eqref{eq:repa_sigma} a safe modification of the auxiliary gradient.
+
+\paragraph{Minimal change.}
+The adapted gradient $r^{\Sigma}$ is the closest vector to $r$ that does not conflict with the reference direction:
+\[
+  r^{\Sigma}
+  \;=\;
+  \operatorname*{arg\,min}_{r'} \ \tfrac{1}{2}\|r' - r\|_2^2
+  \quad \text{s.t.} \quad
+  \langle r', \bar g\rangle \ge 0 .
+\]
+That is, $r^{\Sigma}$ is the Euclidean projection of $r$ onto the half-space $\{r' : \langle r', \bar g\rangle \ge 0\}$,
+so REPA-$\Sigma$ alters the alignment signal as little as possible while eliminating the conflict.
+
+\paragraph{Guaranteed non-interference.}
+By construction $\langle r^{\Sigma}, \bar g\rangle = \big[\langle r, \bar g\rangle\big]_{+} \ge 0$, where
+$[x]_{+}=\max(x,0)$. Hence for every $\lambda \ge 0$,
+\[
+  \langle u_{\Sigma}, \bar g\rangle
+  \;=\;
+  \langle g, \bar g\rangle + \lambda\,\big[\langle r, \bar g\rangle\big]_{+}
+  \;\ge\;
+  \langle g, \bar g\rangle .
+\]
+Adding the adapted alignment gradient therefore never decreases the inner product with the primary descent direction,
+whereas the vanilla direction $g + \lambda r$ satisfies $\langle g+\lambda r, \bar g\rangle = \langle g,\bar g\rangle +
+\lambda\langle r,\bar g\rangle$, which can fall below $\langle g,\bar g\rangle$ -- and even become negative -- once
+$\lambda\langle r,\bar g\rangle$ is sufficiently negative. In the idealised case where the reference is exact
+($\bar g = g$), a gradient-flow step gives
+\[
+  \frac{d}{dt}\,\mathcal{L}_{\mathrm{diff}}
+  \;=\;
+  -\langle g, u_{\Sigma}\rangle
+  \;=\;
+  -\|g\|_2^2 \;-\; \lambda\,\big[\langle g, r\rangle\big]_{+}
+  \;\le\; -\|g\|_2^2 \;\le\; 0,
+\]
+so the diffusion loss decreases at least as fast as pure diffusion training for any $\lambda$, while still absorbing the
+auxiliary gradient whenever it is aligned. Under the vanilla objective the same quantity is $-\|g\|_2^2 -
+\lambda\langle g,r\rangle$, which is \emph{positive} -- i.e.\ the diffusion loss momentarily increases -- whenever
+$\lambda\langle g,r\rangle < -\|g\|_2^2$. This is exactly the late-training, low-noise regime identified in
+Figure~\ref{fig:grad_compat}.
+
+\subsubsection{Problem setting}
+
+\newcommand{\gauss}{\mathcal{N}}
+
+% Requires: \usepackage{amsmath,amssymb,amsthm,mathtools}
+% Optional theorem declarations:
+\newtheorem{theorem}{Theorem}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+
+\label{sec:linear-repa-sigma}
+
+We begin by introducing simple but expressive setting where baseline REPA
+loss conflicts with diffusion training. Fix a timestep $t$. All mechanism below 
+are conditional on this timestep, so we suppress $t$ from the notation. 
+Let $x_0\in\mathbb R^d$ denote the clean sample and let $u = f_t(x_t)\in\mathbb R^m$
+be a fixed feature vector extracted from the noisy input $x_t$. We assume that $x_0 \sim \mathcal{D}$
+and that the features have been whitened,
+\begin{equation}
+    \mathbb E[uu^\top] = I_m .
+    \label{eq:whitened-features}
+\end{equation}
+
+This is only a second-moment normalization. It does not require the coordinates
+of $u$ to be independent. 
+
+The denoiser is modeled as a linear map $B\in\mathbb R^{d\times m}$, $\widehat x_0 = Bu$. So our model predicts clean sample $x_0$.
+
+The diffusion loss is
+\begin{equation}
+    L_{\rm diff}(B)
+    :=
+    \frac12\,\mathbb E\|Bu-x_0\|^2 .
+    \label{eq:linear-diff-loss}
+\end{equation}
+
+Expanding and using the whitening condition~~\eqref{eq:whitened-features}, we get:
+\begin{equation}
+    L_{\rm diff}(B)
+    :=
+    \frac12\,\mathbb E\|B\|^2_F - \mathbb E \langle B, x_0u^T \rangle + \text{constant}.
+    \label{eq:linear-diff-loss-expansion}
+\end{equation}
+
+Let the unique minimizer of $L_{\rm diff}$ be defined as:
+\begin{equation}
+    A := \mathbb E[x_0u^\top]\in\mathbb R^{d\times m} .
+    \label{eq:A-def}
+\end{equation}
+
+We now model the representation teacher. Let $\mathcal S\subset\mathbb R^d$ be
+an $r$-dimensional semantic subspace, with $r<d$, and let
+$P:\mathbb R^d\to\mathbb R^d$ be the orthogonal projection onto $\mathcal S$:
+\[
+    P^2=P,
+    \qquad
+    P^\top=P .
+\]
+Set $Q:=I-P$. Then
+\[
+    x_0 = Px_0 + Qx_0
+\]
+decomposes the clean sample into a semantic component $Px_0$ and a detail
+component $Qx_0$. Importantly, $Px_0$ has the same ambient dimension as $x_0$,
+but it lies in the lower-dimensional subspace $\mathcal S$.
+
+The REPA-type auxiliary loss is modeled as
+\begin{equation}
+    L_{\rm repa}(B)
+    :=
+    \frac12\,\mathbb E\|Bu-Px_0\|^2 .
+    \label{eq:linear-repa-loss}
+\end{equation}
+Thus the diffusion objective asks the model to predict both semantic and detail
+components, whereas the auxiliary objective aligns the prediction to a target in
+which the detail component has been removed. This is the idealized form of the representation teacher 
+that provides useful semantic guidance while simultaneously discarding information that remains
+predictable from $x_t$ and is needed by the denoising objective.
+
+Standard REPA optimizes the scalarized objective
+\begin{equation}
+    L_\lambda(B)
+    :=
+    L_{\rm diff}(B)+\lambda L_{\rm repa}(B),
+    \qquad
+    \lambda>0 .
+    \label{eq:standard-repa-objective}
+\end{equation}
+By contrast, REPA-$\Sigma$ does not merely minimize the scalarized objective.
+It modifies the auxiliary gradient before adding it to the diffusion gradient.
+Let
+\[
+    g(B) := \nabla L_{\rm diff}(B),
+    \qquad
+    r(B) := \nabla L_{\rm repa}(B).
+\]
+The EMA-stabilized version maintains
+\begin{equation}
+    v_k = \beta v_{k-1} + (1-\beta)g(B_k),
+    \qquad
+    0\le \beta<1,
+    \label{eq:ema-direction}
+\end{equation}
+and uses $v_k$ as the direction with respect to which conflict is measured. For
+any $v,r\in\mathbb R^{d\times m}$, define the surgery operator
+\begin{equation}
+    \Sigma_v(r)
+    :=
+    \begin{cases}
+    r - \dfrac{\langle r,v\rangle}{\|v\|^2}v,
+    &\text{if } v\neq0 \text{ and } \langle r,v\rangle<0,\\[1.2em]
+    r,
+    &\text{otherwise},
+    \end{cases}
+    \label{eq:sigma-operator}
+\end{equation}
+where $\langle M,N\rangle:=\operatorname{tr}(M^\top N)$ and
+$\|M\|:=\|M\|_F$. Thus $\Sigma_v(r)$ removes only the component of the
+auxiliary gradient that is anti-parallel to the EMA diffusion direction.
+
+For a discrete-time convergence statement we analyze a conservative,
+norm-gated version of the EMA update. Let
+\begin{equation}
+    h_k := \Sigma_{v_k}(r(B_k))
+    \label{eq:h-def}
+\end{equation}
+and choose
+\begin{equation}
+    \alpha_k
+    :=
+    \begin{cases}
+    \min\left\{1,\dfrac{\rho\|g(B_k)\|}{\lambda\|h_k\|}\right\},
+    & h_k\neq0,\\[1.1em]
+    1,
+    & h_k=0,
+    \end{cases}
+    \label{eq:alpha-def}
+\end{equation}
+where $\rho>0$. The update is
+\begin{equation}
+    B_{k+1}
+    =
+    B_k - \eta\bigl(g(B_k)+\lambda\alpha_k h_k\bigr).
+    \label{eq:ema-sigma-update}
+\end{equation}
+The gate in~\eqref{eq:alpha-def} is inactive whenever the cleaned auxiliary
+step is already small relative to the diffusion step. Its role in the theorem
+is to make the diffusion optimum a stable fixed point even when the EMA
+direction is stale or imperfect near convergence.
+
+\begin{theorem}[Bias of REPA and consistency of EMA REPA-$\Sigma$]
+\label{thm:linear-repa-sigma}
+Assume the setting above.
+
+\textup{(i) Standard REPA is biased.}
+The diffusion-only optimum is $B^\star_{\rm diff}=A$. The unique minimizer of
+$L_\lambda$ is
+\begin{equation}
+    B^\star_{\rm REPA}
+    =
+    PA + \frac{1}{1+\lambda}QA .
+    \label{eq:biased-repa-optimum}
+\end{equation}
+Consequently,
+\[
+    B^\star_{\rm REPA}=A
+    \quad\Longleftrightarrow\quad
+    QA=0 .
+\]
+If $QA\neq0$, then standard REPA does not converge to the diffusion optimum.
+Moreover,
+\begin{equation}
+    L_{\rm diff}(B^\star_{\rm REPA}) - L_{\rm diff}(A)
+    =
+    \frac{\lambda^2}{2(1+\lambda)^2}\|QA\|^2 .
+    \label{eq:excess-diff-risk}
+\end{equation}
+
+\textup{(ii) EMA REPA-$\Sigma$ is diffusion-consistent under bounded EMA lag.}
+Let $g_k:=g(B_k)=B_k-A$. Suppose the EMA direction tracks the current diffusion
+gradient in the relative sense that, for some $\delta\ge0$,
+\begin{equation}
+    \|v_k-g_k\|\le \delta\|g_k\|
+    \qquad\text{for all }k .
+    \label{eq:ema-lag-assumption}
+\end{equation}
+Assume $\delta\rho<1$. If the stepsize satisfies
+\begin{equation}
+    0<\eta<\frac{2(1-\delta\rho)}{(1+\rho)^2},
+    \label{eq:eta-condition}
+\end{equation}
+then the iterates of~\eqref{eq:ema-sigma-update} obey
+\begin{equation}
+    \|B_k-A\|^2
+    \le
+    \chi^k\|B_0-A\|^2,
+    \qquad
+    \chi
+    :=
+    1-2\eta(1-\delta\rho)+\eta^2(1+\rho)^2
+    <1 .
+    \label{eq:linear-convergence-bound}
+\end{equation}
+In particular, $B_k\to A$.
+\end{theorem}
+
+\subsubsection{Some theory}
+
+\subsubsection{Experiments}
+
+\subsection{CelebA Results}
+\label{sec:repa_sigma_celeba}
+
+We validate the adapter on the CelebA setup of Section~\ref{sec:celeba}, comparing five configurations along two
+independent axes -- gradient surgery (REPA vs.\ REPA-$\Sigma$) and a linear annealing schedule for the alignment weight
+$\lambda$: the diffusion baseline, REPA with constant $\lambda$, REPA-$\Sigma$ with constant $\lambda$, and the
+$\lambda$-annealed versions of both. All models share architecture, optimiser, data, and compute budget; only the
+treatment of the alignment gradient differs.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth]{images/fid_5_methods.png}
+  \caption{FID versus training step for the five configurations on CelebA. Left: linear scale from 50\,k steps;
+  right: log scale over the full range. Every REPA variant converges faster than the diffusion baseline, and the
+  REPA-$\Sigma$ variants track or slightly improve on vanilla REPA throughout training.}
+  \label{fig:fid_5_methods}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.85\linewidth]{images/fid_100k_200k.png}
+  \caption{Late-training zoom (100\,k\,$\rightarrow$\,200\,k steps) on CelebA. Gradient surgery (REPA-$\Sigma$) gives
+  the largest gains in the 100\,k--160\,k window, while annealing $\lambda$ pays off near the end of training; the two
+  effects combine, with REPA-$\Sigma$ $+\ \lambda$-anneal reaching the lowest final FID.}
+  \label{fig:fid_late}
+\end{figure}
+
+Figure~\ref{fig:fid_5_methods} shows the full FID trajectories: all four representation-alignment variants converge
+substantially faster than the diffusion baseline, and the REPA-$\Sigma$ curves match or modestly improve on vanilla
+REPA across the whole run. The differences among the alignment variants are best seen in the late-training zoom of
+Figure~\ref{fig:fid_late}. Two complementary effects emerge. First, the gradient surgery itself is most valuable in the
+\emph{middle} of training (roughly 100\,k--160\,k steps), where REPA-$\Sigma$ with constant $\lambda$ attains the lowest
+FID -- consistent with the theory, since this is the window in which the conflicting low-noise component starts to
+dominate while the alignment weight is still large. Second, \emph{annealing} $\lambda$ pays off \emph{late}: in the
+final 180\,k--200\,k steps the annealed variants overtake their constant-$\lambda$ counterparts. The two mechanisms are
+complementary, and combining them -- REPA-$\Sigma$ with $\lambda$ annealing -- yields the best final quality, reaching
+$\mathrm{FID}\approx 6.0$ at 200\,k steps versus $\approx 6.1$ for vanilla REPA and $\approx 6.6$ for the baseline.
+Overall, removing the anticorrelated component of the REPA gradient is a cheap, theoretically grounded modification that
+never hurts and provides a small but consistent improvement over standard representation alignment, especially when
+paired with a decaying alignment weight.

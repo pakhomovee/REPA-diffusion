@@ -48,16 +48,26 @@ AGENT_NOTES.md
 # Analysis CSVs with absolute machine paths
 reports/**/*.csv
 
-# tex generation
+# tex generation — LaTeX build artifacts (sources live under tex/report and tex/poster)
+tex/**/*.aux
+tex/**/*.bbl
+tex/**/*.bcf
+tex/**/*.blg
+tex/**/*.fdb_latexmk
+tex/**/*.fls
+tex/**/*.log
+tex/**/*.out
+tex/**/*.run.xml
+tex/**/*.synctex.gz
+tex/**/*.nav
+tex/**/*.snm
+tex/**/*.toc
+tex/**/*.xdv
 
-main.aux
-main.bbl
-main.bcf
-main.blg
-main.fdb_latexmk
-main.fls
-main.log
-main.out
-main.run.xml
-main.synctex.gz
-tex/main.pdf
+# Compiled PDFs are built in-tree but published to the repo root by CI
+tex/report/main.pdf
+tex/poster/main.pdf
+tex/poster/out_cmyk*.pdf
+
+# CMYK colour profiles — large binaries, used locally by tex/poster/do_cmyk.sh
+tex/poster/ECI_Offset_2009/

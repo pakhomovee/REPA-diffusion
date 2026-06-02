@@ -1,14 +1,13 @@
-name: Build LaTeX PDF
+name: Build LaTeX PDFs
 
 # Runs when changes land on main (including PR merges). PDF commits do not
-# retrigger this workflow because they do not touch tex/**.
+# retrigger this workflow because the publish commit uses [skip ci].
 on:
   push:
     branches:
       - main
     paths:
       - "tex/**"
-      - "images/**"  
       - ".github/workflows/latex.yml"
 
 permissions:
@@ -27,22 +26,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compile LaTeX
+      - name: Compile report (pdfLaTeX + Biber)
         uses: xu-cheng/latex-action@v3
         with:
-          root_file: tex/main.tex
-          work_in_root_file_dir: true
+          root_file: main.tex
+          working_directory: tex/report
           args: -pdf -file-line-error -halt-on-error -interaction=nonstopmode
 
-      - name: Publish PDF on repository root
+      - name: Compile poster (XeLaTeX)
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main.tex
+          working_directory: tex/poster
+          # Fonts (Lato/Raleway) are vendored in tex/poster/fonts and loaded by
+          # relative path, so no system fonts or fontconfig setup is required.
+          args: -xelatex -file-line-error -halt-on-error -interaction=nonstopmode
+
+      - name: Publish PDFs on repository root
         run: |
-          cp tex/main.pdf main.pdf
+          cp tex/report/main.pdf report.pdf
+          cp tex/poster/main.pdf poster.pdf
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add main.pdf
+          git add report.pdf poster.pdf
           if git diff --staged --quiet; then
-            echo "PDF unchanged; nothing to commit."
+            echo "PDFs unchanged; nothing to commit."
           else
-            git commit -m "chore: update compiled PDF [skip ci]"
+            git commit -m "chore: update compiled PDFs [skip ci]"
             git push
           fi
