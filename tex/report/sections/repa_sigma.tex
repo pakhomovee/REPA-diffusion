@@ -79,9 +79,211 @@ auxiliary gradient whenever it is aligned. Under the vanilla objective the same 
 $\lambda\langle g,r\rangle < -\|g\|_2^2$. This is exactly the late-training, low-noise regime identified in
 Figure~\ref{fig:grad_compat}.
 
-\subsection{Toy Model}
-
 \subsubsection{Problem setting}
+
+\newcommand{\gauss}{\mathcal{N}}
+
+% Requires: \usepackage{amsmath,amssymb,amsthm,mathtools}
+% Optional theorem declarations:
+\newtheorem{theorem}{Theorem}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+
+\label{sec:linear-repa-sigma}
+
+We begin by introducing simple but expressive setting where baseline REPA
+loss conflicts with diffusion training. Fix a timestep $t$. All mechanism below 
+are conditional on this timestep, so we suppress $t$ from the notation. 
+Let $x_0\in\mathbb R^d$ denote the clean sample and let $u = f_t(x_t)\in\mathbb R^m$
+be a fixed feature vector extracted from the noisy input $x_t$. We assume that $x_0 \sim \mathcal{D}$
+and that the features have been whitened,
+\begin{equation}
+    \mathbb E[uu^\top] = I_m .
+    \label{eq:whitened-features}
+\end{equation}
+
+This is only a second-moment normalization. It does not require the coordinates
+of $u$ to be independent. 
+
+The denoiser is modeled as a linear map $B\in\mathbb R^{d\times m}$, $\widehat x_0 = Bu$. So our model predicts clean sample $x_0$.
+
+The diffusion loss is
+\begin{equation}
+    L_{\rm diff}(B)
+    :=
+    \frac12\,\mathbb E\|Bu-x_0\|^2 .
+    \label{eq:linear-diff-loss}
+\end{equation}
+
+Expanding and using the whitening condition~~\eqref{eq:whitened-features}, we get:
+\begin{equation}
+    L_{\rm diff}(B)
+    :=
+    \frac12\,\mathbb E\|B\|^2_F - \mathbb E \langle B, x_0u^T \rangle + \text{constant}.
+    \label{eq:linear-diff-loss-expansion}
+\end{equation}
+
+Let the unique minimizer of $L_{\rm diff}$ be defined as:
+\begin{equation}
+    A := \mathbb E[x_0u^\top]\in\mathbb R^{d\times m} .
+    \label{eq:A-def}
+\end{equation}
+
+We now model the representation teacher. Let $\mathcal S\subset\mathbb R^d$ be
+an $r$-dimensional semantic subspace, with $r<d$, and let
+$P:\mathbb R^d\to\mathbb R^d$ be the orthogonal projection onto $\mathcal S$:
+\[
+    P^2=P,
+    \qquad
+    P^\top=P .
+\]
+Set $Q:=I-P$. Then
+\[
+    x_0 = Px_0 + Qx_0
+\]
+decomposes the clean sample into a semantic component $Px_0$ and a detail
+component $Qx_0$. Importantly, $Px_0$ has the same ambient dimension as $x_0$,
+but it lies in the lower-dimensional subspace $\mathcal S$.
+
+The REPA-type auxiliary loss is modeled as
+\begin{equation}
+    L_{\rm repa}(B)
+    :=
+    \frac12\,\mathbb E\|Bu-Px_0\|^2 .
+    \label{eq:linear-repa-loss}
+\end{equation}
+Thus the diffusion objective asks the model to predict both semantic and detail
+components, whereas the auxiliary objective aligns the prediction to a target in
+which the detail component has been removed. This is the idealized form of the representation teacher 
+that provides useful semantic guidance while simultaneously discarding information that remains
+predictable from $x_t$ and is needed by the denoising objective.
+
+Standard REPA optimizes the scalarized objective
+\begin{equation}
+    L_\lambda(B)
+    :=
+    L_{\rm diff}(B)+\lambda L_{\rm repa}(B),
+    \qquad
+    \lambda>0 .
+    \label{eq:standard-repa-objective}
+\end{equation}
+By contrast, REPA-$\Sigma$ does not merely minimize the scalarized objective.
+It modifies the auxiliary gradient before adding it to the diffusion gradient.
+Let
+\[
+    g(B) := \nabla L_{\rm diff}(B),
+    \qquad
+    r(B) := \nabla L_{\rm repa}(B).
+\]
+The EMA-stabilized version maintains
+\begin{equation}
+    v_k = \beta v_{k-1} + (1-\beta)g(B_k),
+    \qquad
+    0\le \beta<1,
+    \label{eq:ema-direction}
+\end{equation}
+and uses $v_k$ as the direction with respect to which conflict is measured. For
+any $v,r\in\mathbb R^{d\times m}$, define the surgery operator
+\begin{equation}
+    \Sigma_v(r)
+    :=
+    \begin{cases}
+    r - \dfrac{\langle r,v\rangle}{\|v\|^2}v,
+    &\text{if } v\neq0 \text{ and } \langle r,v\rangle<0,\\[1.2em]
+    r,
+    &\text{otherwise},
+    \end{cases}
+    \label{eq:sigma-operator}
+\end{equation}
+where $\langle M,N\rangle:=\operatorname{tr}(M^\top N)$ and
+$\|M\|:=\|M\|_F$. Thus $\Sigma_v(r)$ removes only the component of the
+auxiliary gradient that is anti-parallel to the EMA diffusion direction.
+
+For a discrete-time convergence statement we analyze a conservative,
+norm-gated version of the EMA update. Let
+\begin{equation}
+    h_k := \Sigma_{v_k}(r(B_k))
+    \label{eq:h-def}
+\end{equation}
+and choose
+\begin{equation}
+    \alpha_k
+    :=
+    \begin{cases}
+    \min\left\{1,\dfrac{\rho\|g(B_k)\|}{\lambda\|h_k\|}\right\},
+    & h_k\neq0,\\[1.1em]
+    1,
+    & h_k=0,
+    \end{cases}
+    \label{eq:alpha-def}
+\end{equation}
+where $\rho>0$. The update is
+\begin{equation}
+    B_{k+1}
+    =
+    B_k - \eta\bigl(g(B_k)+\lambda\alpha_k h_k\bigr).
+    \label{eq:ema-sigma-update}
+\end{equation}
+The gate in~\eqref{eq:alpha-def} is inactive whenever the cleaned auxiliary
+step is already small relative to the diffusion step. Its role in the theorem
+is to make the diffusion optimum a stable fixed point even when the EMA
+direction is stale or imperfect near convergence.
+
+\begin{theorem}[Bias of REPA and consistency of EMA REPA-$\Sigma$]
+\label{thm:linear-repa-sigma}
+Assume the setting above.
+
+\textup{(i) Standard REPA is biased.}
+The diffusion-only optimum is $B^\star_{\rm diff}=A$. The unique minimizer of
+$L_\lambda$ is
+\begin{equation}
+    B^\star_{\rm REPA}
+    =
+    PA + \frac{1}{1+\lambda}QA .
+    \label{eq:biased-repa-optimum}
+\end{equation}
+Consequently,
+\[
+    B^\star_{\rm REPA}=A
+    \quad\Longleftrightarrow\quad
+    QA=0 .
+\]
+If $QA\neq0$, then standard REPA does not converge to the diffusion optimum.
+Moreover,
+\begin{equation}
+    L_{\rm diff}(B^\star_{\rm REPA}) - L_{\rm diff}(A)
+    =
+    \frac{\lambda^2}{2(1+\lambda)^2}\|QA\|^2 .
+    \label{eq:excess-diff-risk}
+\end{equation}
+
+\textup{(ii) EMA REPA-$\Sigma$ is diffusion-consistent under bounded EMA lag.}
+Let $g_k:=g(B_k)=B_k-A$. Suppose the EMA direction tracks the current diffusion
+gradient in the relative sense that, for some $\delta\ge0$,
+\begin{equation}
+    \|v_k-g_k\|\le \delta\|g_k\|
+    \qquad\text{for all }k .
+    \label{eq:ema-lag-assumption}
+\end{equation}
+Assume $\delta\rho<1$. If the stepsize satisfies
+\begin{equation}
+    0<\eta<\frac{2(1-\delta\rho)}{(1+\rho)^2},
+    \label{eq:eta-condition}
+\end{equation}
+then the iterates of~\eqref{eq:ema-sigma-update} obey
+\begin{equation}
+    \|B_k-A\|^2
+    \le
+    \chi^k\|B_0-A\|^2,
+    \qquad
+    \chi
+    :=
+    1-2\eta(1-\delta\rho)+\eta^2(1+\rho)^2
+    <1 .
+    \label{eq:linear-convergence-bound}
+\end{equation}
+In particular, $B_k\to A$.
+\end{theorem}
 
 \subsubsection{Some theory}
 
