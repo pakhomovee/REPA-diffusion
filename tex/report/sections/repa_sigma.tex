@@ -75,11 +75,11 @@ $\lambda\langle r,\bar g\rangle$ is sufficiently negative. In the idealised case
 \]
 so the diffusion loss decreases at least as fast as pure diffusion training for any $\lambda$, while still absorbing the
 auxiliary gradient whenever it is aligned. Under the vanilla objective the same quantity is $-\|g\|_2^2 -
-\lambda\langle g,r\rangle$, which is \emph{positive} -- i.e.\ the diffusion loss momentarily increases -- whenever
+\lambda\langle g,r\rangle$, which can be \emph{positive} -- i.e.\ the diffusion loss momentarily increases whenever
 $\lambda\langle g,r\rangle < -\|g\|_2^2$. This is exactly the late-training, low-noise regime identified in
 Figure~\ref{fig:grad_compat}.
 
-\subsubsection{Problem setting}
+\subsubsection{Simplified Theoretical Setting}
 
 \newcommand{\gauss}{\mathcal{N}}
 

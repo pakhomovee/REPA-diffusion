@@ -1,6 +1,15 @@
 \section{Memorization Examples}
 \label{app:memorization}
 
+\paragraph{Training Configuration.}
+The corrected model is trained with the DINOv2-ViT-S teacher, with REPA
+alignment applied to the encoder representation at depth 4. We use a REPA
+coefficient $\lambda=0.8$, CFG dropout probability $0.2$, batch size 256,
+learning rate $10^{-4}$, and gradient clipping at $1.0$. Training runs for
+100{,}000 steps. More aggressive regularizers (covariance decorrelation,
+VAE-based random crop) were explored but did not improve results or destabilized
+training.
+
 \begin{figure}[H]
   \centering
   \begin{subfigure}[b]{0.483\textwidth}
@@ -90,9 +99,17 @@ indistinguishable.
 
 \paragraph{Mitigated Model (Shallow + Flip).}
 
-We repeat the same evaluation for the shallow model trained with random flip
-augmentation, after 100k steps and sampled at CFG=4.0. The results are
-shown in Table~\ref{tab:imagenette_comparison}. The mean similarity drops to
+We repeat the same evaluation for the shallow model trained with
+random horizontal flip augmentation. The model uses the DINOv2-ViT-S teacher,
+REPA alignment at encoder depth 4, coefficient $\lambda=0.8$, CFG dropout
+probability $0.2$, batch size 256, learning rate $10^{-4}$, and gradient
+clipping at $1.0$, trained for 100{,}000 steps. More aggressive regularizers
+(covariance decorrelation, VAE-based random crop) were explored but did not improve
+results or destabilized training. Sampling is performed at CFG=$4.0$ to match the evaluation
+conditions of the old model.
+
+
+The results are shown in Table~\ref{tab:imagenette_comparison}. The mean similarity drops to
 $0.470$, and crucially, \emph{no} generation has a training neighbour with
 similarity $>0.9$ (0.0\%). The classification accuracy falls to a more
 reasonable $51\%$ -- still well above chance, indicating that the model has
