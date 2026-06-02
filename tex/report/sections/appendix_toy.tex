@@ -3,7 +3,7 @@
 
 This appendix provides a deeper empirical analysis of the capacity mismatch and the REPA-\texorpdfstring{$\Sigma$}{Sigma} mechanism introduced in Section~\ref{sec:repa_sigma_experiments}. We focus on exactly \emph{when} gradient conflict occurs during the diffusion process, and whether the observed bias is a transient learning artifact or a permanent fixed-point alteration.
 
-\subsection{Robustness to Alignment Strength and Capacity Mismatch}
+\paragraph{Robustness to Alignment Strength and Capacity Mismatch}
 To understand how the capacity mismatch explicitly harms the denoiser, we simulated a diagonal linear denoiser trained on a synthetic data distribution. The distribution comprised semantic coordinates (a mixture of Gaussians) and detail coordinates (pure Gaussian noise). The teacher projection explicitly preserved the semantic coordinates while zeroing out the detail coordinates.
 
 If the denoiser blindly follows the teacher, it should lose its ability to generate details. To test this, we swept the REPA alignment weight $\lambda$, tracking the final Total MSE of the model. 
@@ -17,7 +17,7 @@ As shown in Figure~\ref{fig:lambda_sweep_robustness}, standard REPA is highly br
   \label{fig:lambda_sweep_robustness}
 \end{figure}
 
-\subsection{Long-Training Fixed-Point Proof}
+\paragraph{Long-Training Fixed-Point Proof}
 A critical question when evaluating the blurry MNIST outputs (Figure~\ref{fig:mnist_samples}) is whether standard REPA simply learns high-frequency details \emph{slower}, or if the model's capacity to learn them is permanently destroyed.
 
 We address this by training a non-linear Multi-Layer Perceptron (MLP) on MNIST for an extended 10,000-step regime (Figure~\ref{fig:mnist_long_training}). The results prove that standard REPA alters the fundamental fixed-point of the network: after 10,000 steps, its high-frequency (HF) MSE remains at 0.0091, permanently elevated above the pure diffusion baseline (0.0061). The effective HF gain similarly plateaus at 0.12, far below the baseline's 0.20. This confirms the bias is not a transient training artifact.
