@@ -1,0 +1,72 @@
+\section{Task setting}
+
+We follow the notation of REPA. Let $x \sim \mathcal{D}$ be a clean image from the training distribution, and let
+\[
+z = E(x)
+\]
+be its latent representation produced by the encoder $E$ of a pretrained autoencoder. The base diffusion model follows the SiT velocity-prediction formulation used in REPA. Given Gaussian noise $\epsilon \sim \mathcal{N}(0,I)$, we define an interpolation path
+\[
+z_t = \alpha_t z + \sigma_t \epsilon ,
+\]
+where $t \in [0,1]$ and $\alpha_t,\sigma_t$ determine how the clean latent is gradually transformed into noise. The training target is the velocity of this path with respect to $t$:
+\[
+u_t(z,\epsilon)
+=
+\frac{d z_t}{dt}
+=
+\frac{d\alpha_t}{dt} z
++
+\frac{d\sigma_t}{dt} \epsilon .
+\]
+
+The velocity model $v_\theta(z_t,t)$ is trained to approximate this target:
+\[
+\mathcal{L}_{\mathrm{diff}}(\theta)
+=
+\mathbb{E}_{z,\epsilon,t}
+\left[
+\left\|
+v_\theta(z_t,t) - u_t(z,\epsilon)
+\right\|_2^2
+\right].
+\]
+For the linear interpolation commonly used in this setting, $\alpha_t=1-t$ and $\sigma_t=t$, so $u_t(z,\epsilon)=\epsilon-z$.
+
+REPA adds an auxiliary representation-alignment objective. Let $f$ be a frozen pretrained visual encoder, and let
+\[
+y = f(x) \in \mathbb{R}^{N \times C}
+\]
+be the clean image representation extracted by this encoder, where $N$ is the number of patches and $C$ is the representation dimension. Let $H_\theta^\ell(z_t,t)$ denote the intermediate hidden states of the diffusion transformer at layer $\ell$. A trainable projection head $h_\psi$ maps these hidden states into the teacher representation space.
+
+The REPA loss aligns projected noisy hidden states with clean teacher features by maximizing patch-wise similarity:
+\[
+\mathcal{L}_{\mathrm{REPA}}(\theta,\psi)
+=
+-
+\mathbb{E}_{x,\epsilon,t}
+\left[
+\frac{1}{N}
+\sum_{n=1}^{N}
+\operatorname{sim}
+\left(
+y_n,
+h_\psi(H_\theta^\ell(z_t,t))_n
+\right)
+\right],
+\]
+where $n$ indexes spatial patches and $\operatorname{sim}(\cdot,\cdot)$ denotes the similarity function used for representation alignment.
+
+The final objective is
+\[
+\mathcal{L}(\theta,\psi)
+=
+\mathcal{L}_{\mathrm{diff}}(\theta)
++
+\lambda
+\mathcal{L}_{\mathrm{REPA}}(\theta,\psi),
+\]
+where $\lambda$ controls the strength of the alignment term.
+
+Our main experimental question is whether this auxiliary alignment term improves training in small-scale and narrow-domain settings. We will compare the vanilla diffusion objective against REPA-style training under matched architecture, optimizer, data, and compute budgets. We will also vary the frozen representation encoder $f$ and study whether its representations provide useful guidance for generation.
+
+This setting allows us to test two competing hypotheses. The optimistic hypothesis is that REPA should be especially useful in low-data regimes because the pretrained encoder supplies an external representation prior that the diffusion model would otherwise need to learn from limited data. The skeptical hypothesis is that this prior may be mismatched. In particular, a teacher encoder can encode strong global semantic information while still having patch-level representations that are poorly aligned with the spatial structure required in a narrow domain. In that case, minimizing $\mathcal{L}_{\mathrm{REPA}}$ may force the diffusion model to match representations that are globally meaningful but locally suboptimal for generation, reducing or even reversing the expected benefit of REPA.
