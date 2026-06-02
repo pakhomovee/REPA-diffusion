@@ -61,12 +61,8 @@ We mitigate memorization by two complementary strategies. First, we reduce model
 capacity: instead of the standard SiT-B/2 (depth 12), we use a shallower variant,
 \texttt{SiT-B-shallow/2}, with only 6 transformer blocks while keeping the hidden
 dimension (768) and patch size (2) unchanged. Second, we apply random horizontal
-flip augmentation to both the raw image and its VAE latent during training. The
-corrected model is trained with the DINOv2-vit-s teacher, projection from encoder
-depth 4, REPA coefficient $\lambda=0.8$, CFG dropout probability $0.2$, batch size
-256, learning rate $10^{-4}$, and gradient clipping at $1.0$ for 100\,000 steps. More
-aggressive regularizers (covariance decorrelation, VAE-based random crop) were
-explored but did not improve results or destabilized training.
+flip augmentation to both the raw image and its VAE latent during training. Full
+training details for the corrected model are provided in Appendix~\ref{app:memorization}.
 
 \paragraph{Key Takeaways.} In this section we only present our final results. For
 a more detailed discussion about reducing memorization in low-data regimes
