@@ -92,6 +92,7 @@ setup and extend the same anti-memorization protocol to other small-scale
 benchmarks.
 
 \subsection{CelebA}
+\label{sec:celeba}
 
 Since training on small, multi-domain datasets leads to memorization, we investigate
 whether single-domain datasets are subject to this issue as well. We select the
@@ -134,9 +135,33 @@ c = \cos(\nabla_{w} \mathcal{L}_{diffusion}, \nabla_{w} \mathcal{L}_{REPA})
 $$
 
 Contrary to our assumption, we find that $c$ depends on both noise level and training iteration, varying from highly positive
-at high noise levels to negative at lower noise levels and later training iterations. This is in line with the findings
-presented in [https://arxiv.org/abs/2505.16792]. The paper suggest simply turning off the extra loss during later training iterations,
-but this seems to be too simplistic, so we try to develop our own approach.
+at high noise levels to negative at lower noise levels and later training iterations (Figure~\ref{fig:grad_compat}, left).
+This is in line with the findings presented in~\cite{wang2025haste}. That work suggests simply turning off the extra loss
+during later training iterations, but this seems to be too simplistic. Weighting the cosine by the relative gradient
+magnitude (the ``useful work'' the alignment term performs, Figure~\ref{fig:grad_compat}, right) shows that the conflict
+is concentrated at low noise levels rather than uniformly across training, so we try to develop our own, noise-aware approach.
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/1_cos_vs_t__blocks_0_3__raw.png}
+    \caption{Gradient compatibility $c$}
+    \label{fig:grad_compat_cos}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{images/4_useful_work_vs_t__blocks_0_3__raw.png}
+    \caption{Useful work ($c \times$ magnitude ratio)}
+    \label{fig:grad_compat_work}
+  \end{subfigure}
+  \caption{Compatibility of the diffusion and REPA gradients in the early transformer blocks (0--3) as a
+  function of the diffusion timestep $t$, across training checkpoints. Left: the cosine $c$ is highly positive at high
+  noise levels (large $t$) but turns negative at low noise levels and later iterations. Right: weighting $c$ by the
+  relative gradient magnitude (``useful work'') localises the conflict to the low-noise regime.}
+  \label{fig:grad_compat}
+\end{figure}
 
 \subsubsection{Structural Analysis}
 
