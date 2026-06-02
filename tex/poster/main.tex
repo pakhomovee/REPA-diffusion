@@ -65,7 +65,7 @@
 
 \title{Investigating the Impact of REPA Loss on Training Speed and Generation Quality in Diffusion Models}
 \author{Evgenii Pakhomov, Dmitrii Gromak, Sergei Kopylov, Miron Makhlin, Vladimir Novikov}
-\institute[HSE]{HSE University \quad---\quad Methods of Optimization in Machine Learning}
+\institute[HSE]{HSE University, Methods of Optimization in Machine Learning course}
 
 \footercontent{\hfill MOML course project \hfill}
 \logoright{\includegraphics[height=4.8cm]{hse_logo.pdf}}
@@ -81,13 +81,14 @@
 
 \begin{block}{Motivation}
 \textbf{REPA} accelerates diffusion training by aligning a transformer's hidden states with clean features from a
-frozen encoder (DINOv2). We ask \emph{when} this helps --- and show a constant alignment weight eventually hurts.
+frozen encoder (DINOv2). We ask \emph{when} this helps, show that a constant alignment weight eventually hurts and
+compare effects on different single-domain datasets.
 \end{block}
 
 \begin{block}{The Problem: Gradient Conflict}
 We track the cosine between the diffusion and REPA gradients,
 $c = \cos\!\big(\nabla_w \mathcal{L}_{\mathrm{diff}},\ \nabla_w \mathcal{L}_{\mathrm{REPA}}\big)$.
-It is \emph{positive} at high noise but turns \emph{negative} at low noise and late in training --- there the
+It is \emph{positive} at high noise but turns \emph{negative} at low noise and late in training -- there the
 auxiliary term pulls the update \emph{against} the diffusion objective.
 \begin{figure}
   \centering
@@ -102,27 +103,26 @@ gradient $g$:
 \[ r^{\Sigma}=r-\frac{[\langle r,\bar g\rangle]_-}{\|\bar g\|_2^2}\,\bar g,\qquad [x]_-=\min(x,0). \]
 \textbf{Minimal change:} projection of $r$ onto $\{r':\langle r',\bar g\rangle\ge0\}$.\\
 \textbf{Non-interference:} $\langle g+\lambda r^{\Sigma},\bar g\rangle\ge\langle g,\bar g\rangle$ for all
-$\lambda\ge0$ --- the adapted gradient never works against the diffusion descent direction. Parameter-free.
+$\lambda\ge0$ -- the adapted gradient never works against the diffusion descent direction.
 \end{block}
 
 \begin{block}{Toy Model: Whitened Linear Setting}
-Clean sample $x_0\in\mathbb R^d$; whitened features $u$ with $\mathbb E[uu^\top]=I$; linear denoiser $\hat x_0=Bu$.
-The diffusion loss $L_{\mathrm{diff}}(B)=\tfrac12\mathbb E\|Bu-x_0\|^2$ has the unique optimum
-$A=\mathbb E[x_0u^\top]$. A teacher projects onto an $r$-dim semantic subspace ($P^2=P$, $Q=I-P$), giving
-$L_{\mathrm{repa}}(B)=\tfrac12\mathbb E\|Bu-Px_0\|^2$ --- it keeps the semantic part $Px_0$ and \emph{drops} the
-detail $Qx_0$.
+\textbf{Setting.} Let $x_0\in\mathbb R^d$ be a clean sample. We assume whitened features $u$ with $\mathbb E[uu^\top]=I$ and a
+linear denoiser $\hat x_0=Bu$. The diffusion loss $L_{\mathrm{diff}}(B)=\tfrac12\mathbb E\|Bu-x_0\|^2$ has the unique optimum
+$A=\mathbb E[x_0u^\top]$. We consider a teacher which projects onto an $r$-dim semantic subspace ($P^2=P$, $Q=I-P$), giving
+$L_{\mathrm{repa}}(B)=\tfrac12\mathbb E\|Bu-Px_0\|^2$ -- it keeps the semantic part $Px_0$ and \emph{drops} the detail $Qx_0$.
 
 \textbf{Result.} Standard REPA minimises $L_{\mathrm{diff}}+\lambda L_{\mathrm{repa}}$, with optimum
 $B^\star_\lambda = PA + \tfrac{1}{1+\lambda}\,QA$: the detail is shrunk, so it \emph{cannot} reach $A$ for
-$\lambda>0$. REPA-$\Sigma$ keeps $A$ a stationary point for every $\lambda$ --- it provably reaches the optimal
-denoiser $A$ while still using the alignment signal.
+$\lambda>0$. REPA-$\Sigma$ keeps $A$ a stationary point for every $\lambda$ -- it provably reaches the optimal
+denoiser $A$ while still using the alignment signal (under some extra assumptions).
 \end{block}
 
 \begin{block}{Toy Experiments}
-Experiments supporting the Toy Model results above --- empirically confirming that REPA-$\Sigma$ reaches the
+Experiments supporting the Toy Model results above -- empirically confirming that REPA-$\Sigma$ reaches the
 optimal denoiser $A$ while vanilla REPA stays biased.
 \todobox{5.2cm}{\normalfont\upshape
-(1) Diagonal-matrix model with an independent-features teacher --- closed-form convergence to $A$ under
+(1) Diagonal-matrix model with an independent-features teacher -- closed-form convergence to $A$ under
 REPA-$\Sigma$ vs.\ biased REPA. \quad
 (2) MLP denoiser on MNIST/CIFAR trained with a REPA-style teacher matching our setting.}
 \end{block}
@@ -135,14 +135,18 @@ REPA-$\Sigma$ vs.\ biased REPA. \quad
 \begin{column}{\colwidth}
 
 \begin{block}{Convergence across Three Datasets}
-This section compares the impact of \textbf{REPA} vs.\ \textbf{REPA-$\Sigma$} ($\pm\,\lambda$-anneal), against the
-diffusion baseline, on convergence speed (FID/KID) across three single-domain datasets spanning a
-spatial-difficulty axis. On \textbf{CelebA}, surgery helps mid-training and $\lambda$-annealing late; combining
+This section compares the impact of REPA vs.\ REPA-$\Sigma$ (w or w/o $\lambda$-anneal), against the
+diffusion baseline, on convergence speed (FID) across three single-domain datasets spanning a
+spatial-difficulty axis (the lower the dataset, the harder it is).
+
+We plan to compare convergence curves between datasets.
+
+On \textbf{CelebA}, surgery helps mid-training and $\lambda$-annealing late; combining
 both gives the best final FID.
 \begin{figure}
   \centering
   \includegraphics[width=\linewidth]{fid_100k_200k.png}
-  \caption{CelebA --- late-training FID. REPA-$\Sigma$ $+\,\lambda$-anneal wins.}
+  \caption{CelebA -- late-training FID. REPA-$\Sigma$ $+\,\lambda$-anneal wins.}
 \end{figure}
 \vspace{0.2em}
 \todobox{12.6cm}{LSUN Church \\[0.3em]\normalfont\upshape FID/KID convergence: baseline vs.\ REPA vs.\
@@ -160,13 +164,16 @@ across all methods.}
 \begin{column}{\colwidth}
 
 \begin{block}{Feature Maps \& Generation across Three Datasets}
-This section compares the impact of \textbf{REPA} vs.\ \textbf{REPA-$\Sigma$} on the learned feature maps and
-generations across the three datasets. PCA maps show REPA preserves semantic, face-centred structure through the
+This section compares the impact of REPA vs.\ REPA-$\Sigma$ using PCA feature maps and
+generations across the three datasets. In CelebA PCA maps show REPA preserves semantic, face-centred structure through the
 mid-network and under heavy noise, where the baseline collapses; we extend the comparison to all three domains.
+
+We plan to compare feature maps between datasets.
+
 \begin{figure}
   \centering
   \includegraphics[width=0.62\linewidth]{noise_layers.png}
-  \caption{CelebA --- per-block PCA maps: image / Baseline / REPA.}
+  \caption{CelebA -- per-block PCA maps: image / Baseline / REPA.}
 \end{figure}
 \vspace{0.1em}
 \todoboxw{0.62\linewidth}{10.8cm}{LSUN Church \\[0.3em]\normalfont\upshape PCA feature maps \& generation samples
@@ -179,7 +186,7 @@ generation samples.}
 \begin{alertblock}{Full Report}
 \begin{center}
   \qrcode[height=1.5in]{\reporturl}\\[0.4ex]
-  {\small Full report --- link to be added}
+  {\small Full report -- link to be added}
 \end{center}
 \end{alertblock}
 
