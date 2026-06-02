@@ -288,7 +288,34 @@ In particular, $B_k\to A$.
 \textbf{Proof.} We have already proved this theorem in a slightly easier setting (non-EMA model).
 We plan to finish the EMA part of the proof and add it to the report Appendix in the final stage.
 
-\subsubsection{Experiments}
+\subsubsection{Empirical Validation on Toy Models}
+\label{sec:repa_sigma_experiments}
+
+To empirically validate the theoretical capacity mismatch derived in Section~\ref{sec:linear-repa-sigma}, we evaluate the REPA-\texorpdfstring{$\Sigma$}{Sigma} mechanism in highly controlled, isolated settings. The core conflict arises because representation teachers (e.g., pretrained encoders or low-pass filters) provide excellent global semantic guidance but explicitly discard high-frequency fine details. If a diffusion model unconditionally aligns its representations with such a teacher, it loses the capacity to generate those details.
+
+We study this phenomenon across two settings: a synthetic Gaussian-mixture data space (separating semantic and detail coordinates) and an image-space MNIST setup using a fixed Gaussian-blur teacher. An exhaustive description of the experimental setups, timestep dynamics, and long-training proofs is provided in Appendix~\ref{app:extended_toy}.
+
+\paragraph{The Bias-Speed Tradeoff.}
+Our empirical results reveal that standard REPA forces a harsh Pareto tradeoff. By optimising the scalarised objective in \eqref{eq:standard-repa-objective}, the denoiser accelerates its learning of semantic structures but suffers a permanent, mathematically inescapable bias that suppresses detail generation. In the synthetic neural denoiser (Figure~\ref{fig:bias_speed_pareto}), standard REPA reaches the target semantic MSE ($\leq 0.137$) in only $1\,350\pm 41$ steps, yet incurs a severe detail-gain bias of $0.281$ relative to the diffusion-only fixed point ($b=0.692$). Pure diffusion training is unbiased (final bias $0.006$) but requires $2\,783\pm 118$ steps to reach the same semantic quality.
+
+REPA-\texorpdfstring{$\Sigma$}{Sigma} mitigates this tradeoff. By performing dynamic gradient surgery and projecting out the anti-aligned component via \eqref{eq:sigma-operator}, the adapter reduces the detail bias to $0.224$ while accelerating convergence to $1\,167\pm 24$ steps. In the idealised linear diagonal denoiser---where the theory is exact---this surgery alone is sufficient to recover the unbiased diffusion optimum (mean $|w-b|=0.0000$ on detail coordinates). However, in the non-linear neural denoiser plotted in Figure~\ref{fig:bias_speed_pareto}, the EMA reference direction is imperfect, and REPA-\texorpdfstring{$\Sigma$}{Sigma} alone still leaves a residual bias. \textbf{It is the combination of REPA-\texorpdfstring{$\Sigma$}{Sigma} with a decaying alignment weight (linear $\lambda$-annealing) that breaks the tradeoff entirely:} REPA-\texorpdfstring{$\Sigma$}{Sigma} + anneal achieves near-zero detail bias ($0.006$, matching plain diffusion) in only $1\,250\pm 41$ steps, strictly dominating the Pareto frontier.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\linewidth]{images/syn_F_bias_speed_pareto.png}
+  \caption{The Bias-Speed Pareto frontier on a synthetic neural denoiser. Standard REPA (red) converges quickly on semantics but suffers a high detail bias ($|w_{\mathrm{eff}}-b|=0.281$). Pure diffusion (grey) is unbiased ($0.006$) but slow ($2\,783$ steps). REPA-\texorpdfstring{$\Sigma$}{Sigma} alone (teal) reduces the bias to $0.224$ but does not eliminate it; \textbf{REPA-\texorpdfstring{$\Sigma$}{Sigma} with $\lambda$-annealing} (blue) achieves near-zero bias ($0.006$) in $1\,250$ steps, attaining the optimal ``down-and-left'' configuration.}
+  \label{fig:bias_speed_pareto}
+\end{figure}
+
+\paragraph{Image-Space Visualisation.}
+To ground this theoretical result in pixel space, we applied the methods to MNIST using a spatial Gaussian low-pass filter as the teacher. Here, low spatial frequencies encode the semantic digit shape, while high spatial frequencies encode fine details and edges. After $2\,500$ steps, standard REPA explicitly biases the generator towards blurry outputs: its high-frequency MSE is $0.0103$ versus the diffusion baseline's $0.0077$, and it fails to reach the target low-frequency MSE within the training budget. REPA-\texorpdfstring{$\Sigma$}{Sigma} substantially mitigates this blur (HF MSE $0.0084$), but a slight softness remains. \textbf{The combination of REPA-\texorpdfstring{$\Sigma$}{Sigma} with $\lambda$-annealing fully recovers sharp edges} (HF MSE $0.0074$) while converging faster ($1\,725\pm 25$ steps vs. $1\,975\pm 75$ for plain diffusion), as shown in Figure~\ref{fig:mnist_samples}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\linewidth]{images/mnist_I_samples.png}
+  \caption{Visual comparison of single-step MLP denoising on MNIST with a Gaussian-blur teacher. Standard REPA produces persistently blurry digits due to detail-gradient suppression. REPA-\texorpdfstring{$\Sigma$}{Sigma} reduces the blur, but the sharpest reconstructions are achieved by REPA-\texorpdfstring{$\Sigma$}{Sigma} combined with $\lambda$-annealing, which matches the diffusion baseline.}
+  \label{fig:mnist_samples}
+\end{figure}
 
 \subsection{CelebA Results}
 \label{sec:repa_sigma_celeba}
