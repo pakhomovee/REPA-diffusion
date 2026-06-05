@@ -90,6 +90,8 @@ def export_split(
     for img_pil, info in tqdm(dataset, desc=f"Exporting {split}"):
         class_id = info["class_id"]
         img_idx  = class_counters.get(class_id, 0)
+        if max_images_per_class is not None and img_idx >= max_images_per_class:
+            continue
         class_counters[class_id] = img_idx + 1
 
         rel_path = f"{class_dirs[class_id].name}/{img_idx:06d}.jpg"
@@ -184,8 +186,17 @@ def main() -> None:
             "or both (101,000). Default: train."
         ),
     )
+    parser.add_argument(
+        "--max-images-per-class", type=int, default=None, metavar="N",
+        help=(
+            "Cap the number of images exported per class. "
+            "Useful for smoke tests (e.g. --max-images-per-class 5). "
+            "Default: no limit."
+        ),
+    )
     args = parser.parse_args()
-    export(args.root_dir, args.output_dir, args.split, args.resolution)
+    export(args.root_dir, args.output_dir, args.split, args.resolution,
+           max_images_per_class=args.max_images_per_class)
 
 
 if __name__ == "__main__":
