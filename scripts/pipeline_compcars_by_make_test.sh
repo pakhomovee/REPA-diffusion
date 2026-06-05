@@ -68,7 +68,7 @@ print(len(d))
     echo ""
     echo "=== [2/3] Encoding VAE latents (single GPU: cuda:$ENCODE_GPU) ==="
     python "$PREPROC/dataset_tools.py" encode \
-        --source     "$OUTPUT_DIR" \
+        --source     "$OUTPUT_DIR/images" \
         --dest       "$DEST" \
         --model-url  "$VAE_MODEL" \
         --batch-size "$ENCODE_BATCH_SIZE" \
@@ -100,7 +100,7 @@ print(len(d))
       --encoder-depth=4 \
       --output-dir="../runs" \
       --exp-name="compcars_make_test_baseline" \
-      --data-dir="$DEST" \
+      --data-dir="$OUTPUT_DIR" \
       --resolution=256 \
       --batch-size="$BATCH_SIZE" \
       --max-train-steps="$TRAIN_STEPS" \
@@ -129,7 +129,7 @@ print(len(d))
       --encoder-depth=4 \
       --output-dir="../runs" \
       --exp-name="compcars_make_test_repa" \
-      --data-dir="$DEST" \
+      --data-dir="$OUTPUT_DIR" \
       --resolution=256 \
       --batch-size="$BATCH_SIZE" \
       --max-train-steps="$TRAIN_STEPS" \

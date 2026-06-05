@@ -49,7 +49,7 @@ echo "=== [2/3] Encoding VAE latents on $NUM_ENCODE_GPUS GPU(s) ==="
 pids=()
 for i in $(seq 0 $((NUM_ENCODE_GPUS - 1))); do
     python "$PREPROC/dataset_tools.py" encode \
-        --source     "$OUTPUT_DIR" \
+        --source     "$OUTPUT_DIR/images" \
         --dest       "$DEST" \
         --model-url  "$VAE_MODEL" \
         --batch-size "$ENCODE_BATCH_SIZE" \

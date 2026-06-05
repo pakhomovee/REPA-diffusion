@@ -226,11 +226,13 @@ def export(
     ]
     print(f"\nTotal images to export: {len(kept_samples)}")
 
-    # Create output class directories
+    # REPA's dataset.py expects: data_dir/images/ and data_dir/vae-sd/
+    # Write all images under output_dir/images/
+    images_dir = output_dir / "images"
     output_dir.mkdir(parents=True, exist_ok=True)
     class_dirs: dict[int, Path] = {}
     for class_id, make_id in enumerate(kept_makes):
-        cdir = output_dir / f"{class_id:03d}-{slugify(make_display(make_id))}"
+        cdir = images_dir / f"{class_id:03d}-{slugify(make_display(make_id))}"
         cdir.mkdir(parents=True, exist_ok=True)
         class_dirs[class_id] = cdir
 
@@ -258,18 +260,18 @@ def export(
 
         labels.append([rel_path, class_id])
 
-    # Write dataset.json
-    dataset_json = output_dir / "dataset.json"
+    # Write dataset.json into images/ so dataset_tools.py encode can read labels
+    dataset_json = images_dir / "dataset.json"
     with dataset_json.open("w") as f:
         json.dump({"labels": labels}, f)
 
-    # Write classes.json  {str(class_id): "make_name"}
+    # Write classes.json into output_dir root for reference
     classes_json = output_dir / "classes.json"
     with classes_json.open("w") as f:
         json.dump({str(k): v for k, v in class_names.items()}, f, indent=2)
 
     num_classes = len(kept_makes)
-    print(f"\nExported {len(labels)} images → {output_dir}")
+    print(f"\nExported {len(labels)} images → {images_dir}")
     print(f"Number of classes: {num_classes}  (one per manufacturer)")
     print(f"dataset.json  → {dataset_json}")
     print(f"classes.json  → {classes_json}")
@@ -278,7 +280,7 @@ def export(
     print(
         f"  cd REPA/preprocessing\n"
         f"  python dataset_tools.py encode \\\n"
-        f"      --source {output_dir} \\\n"
+        f"      --source {images_dir} \\\n"
         f"      --dest {output_dir}/vae-sd \\\n"
         f"      --model-url stabilityai/sd-vae-ft-mse"
     )
