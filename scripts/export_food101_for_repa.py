@@ -129,6 +129,7 @@ def export(
             root_dir, output_dir, sp, resolution,
             existing_labels=labels,
             existing_class_counters=counters,
+            max_images_per_class=max_images_per_class,
         )
 
     # Write dataset.json into images/ so dataset_tools.py encode can read labels
