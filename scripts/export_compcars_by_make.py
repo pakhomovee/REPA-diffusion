@@ -251,7 +251,7 @@ def export(
         class_counters[class_id] = img_idx + 1
 
         rel_path = f"{class_dirs[class_id].name}/{img_idx:06d}.jpg"
-        out_path = output_dir / rel_path
+        out_path = images_dir / rel_path
 
         if not out_path.exists():
             img = Image.open(img_path).convert("RGB")
