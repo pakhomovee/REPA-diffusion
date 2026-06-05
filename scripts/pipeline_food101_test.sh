@@ -31,7 +31,7 @@ ENCODE_GPU="${ENCODE_GPU:-0}"
 ENCODE_BATCH_SIZE="${ENCODE_BATCH_SIZE:-8}"
 VAE_MODEL="${VAE_MODEL:-stabilityai/sd-vae-ft-mse}"
 TRAIN_STEPS="${TRAIN_STEPS:-100}"
-BATCH_SIZE="${BATCH_SIZE:-16}"
+BATCH_SIZE="${BATCH_SIZE:-8}"
 # ──────────────────────────────────────────────────────────────────────────
 
 DEST="$OUTPUT_DIR/vae-sd"

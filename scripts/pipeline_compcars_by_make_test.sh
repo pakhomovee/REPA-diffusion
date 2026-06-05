@@ -27,12 +27,12 @@
     OUTPUT_DIR="${OUTPUT_DIR:-$DATA/compcars256_by_make_test}"
     RESOLUTION="${RESOLUTION:-256}"
     TEST_MAKES="${TEST_MAKES:-Toyota BMW Audi}"   # small whitelist → ~3 classes
-    MAX_IMAGES_PER_CLASS="${MAX_IMAGES_PER_CLASS:-5}"   # 5 × 3 = ~15 images
+    MAX_IMAGES_PER_CLASS="${MAX_IMAGES_PER_CLASS:-20}"  # 20 × 3 = ~60 images
     ENCODE_GPU="${ENCODE_GPU:-0}"
     ENCODE_BATCH_SIZE="${ENCODE_BATCH_SIZE:-8}"
     VAE_MODEL="${VAE_MODEL:-stabilityai/sd-vae-ft-mse}"
     TRAIN_STEPS="${TRAIN_STEPS:-100}"
-    BATCH_SIZE="${BATCH_SIZE:-16}"
+    BATCH_SIZE="${BATCH_SIZE:-8}"
     # ──────────────────────────────────────────────────────────────────────────
 
     DEST="$OUTPUT_DIR/vae-sd"
@@ -40,7 +40,7 @@
     echo "╔══════════════════════════════════════════════════╗"
     echo "║  CompCars (by make) SMOKE TEST                   ║"
     echo "║  Makes       : $TEST_MAKES"
-    echo "║  Max img/cls : $MAX_IMAGES_PER_CLASS                              ║"
+    echo "║  Max img/cls : $MAX_IMAGES_PER_CLASS (must be > batch_size/classes)    ║"
     echo "║  Train steps : $TRAIN_STEPS                             ║"
     echo "╚══════════════════════════════════════════════════╝"
 
