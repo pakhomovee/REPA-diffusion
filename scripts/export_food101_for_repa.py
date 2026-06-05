@@ -75,8 +75,22 @@ def export_split(
     dataset = Food101Dataset(root_dir=str(root_dir), split=split, download=True)
     print(f"\n[{split}] {len(dataset)} images, {dataset.num_classes} classes")
 
+    # Pre-select indices to export (cap per class before iterating)
+    if max_images_per_class is not None:
+        class_counts: dict[int, int] = dict(existing_class_counters) if existing_class_counters else {}
+        selected_indices = []
+        for idx in range(len(dataset)):
+            _, info = dataset[idx]
+            cid = info["class_id"]
+            if class_counts.get(cid, 0) < max_images_per_class:
+                selected_indices.append(idx)
+                class_counts[cid] = class_counts.get(cid, 0) + 1
+        print(f"  → capped to {len(selected_indices)} images "
+              f"({max_images_per_class} per class)")
+    else:
+        selected_indices = list(range(len(dataset)))
+
     # REPA expects data_dir/images/ and data_dir/vae-sd/
-    # Write all images under output_dir/images/
     images_dir = output_dir / "images"
     class_dirs: dict[int, Path] = {}
     for class_id, class_name in enumerate(dataset.classes):
@@ -87,11 +101,10 @@ def export_split(
     labels = list(existing_labels) if existing_labels else []
     class_counters = dict(existing_class_counters) if existing_class_counters else {}
 
-    for img_pil, info in tqdm(dataset, desc=f"Exporting {split}"):
+    for idx in tqdm(selected_indices, desc=f"Exporting {split}"):
+        img_pil, info = dataset[idx]
         class_id = info["class_id"]
         img_idx  = class_counters.get(class_id, 0)
-        if max_images_per_class is not None and img_idx >= max_images_per_class:
-            continue
         class_counters[class_id] = img_idx + 1
 
         rel_path = f"{class_dirs[class_id].name}/{img_idx:06d}.jpg"
