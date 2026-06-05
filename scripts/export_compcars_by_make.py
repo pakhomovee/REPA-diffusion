@@ -234,6 +234,8 @@ def export(
 
     for img_path, class_id in tqdm(kept_samples, desc="Exporting"):
         img_idx = class_counters.get(class_id, 0)
+        if max_images_per_class is not None and img_idx >= max_images_per_class:
+            continue
         class_counters[class_id] = img_idx + 1
 
         rel_path = f"{class_dirs[class_id].name}/{img_idx:06d}.jpg"
@@ -319,6 +321,14 @@ def main() -> None:
             "If omitted, all makes passing --min-class-size are kept."
         ),
     )
+    parser.add_argument(
+        "--max-images-per-class", type=int, default=None, metavar="N",
+        help=(
+            "Cap the number of images exported per make class. "
+            "Useful for smoke tests (e.g. --max-images-per-class 5). "
+            "Default: no limit."
+        ),
+    )
     args = parser.parse_args()
 
     misc_dir = args.misc_dir or (args.root_dir / "misc")
@@ -330,6 +340,7 @@ def main() -> None:
         resolution=args.resolution,
         min_class_size=args.min_class_size,
         filter_makes=args.makes,
+        max_images_per_class=args.max_images_per_class,
     )
 
 
