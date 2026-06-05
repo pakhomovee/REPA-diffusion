@@ -122,10 +122,20 @@ def load_make_names(misc_dir: Path) -> dict[int, str]:
         return {}
 
     mat = sio.loadmat(str(mat_path), simplify_cells=True)
-    make_name_list = mat.get("make_names") or mat.get("MN")
+
+    # Use explicit None checks — numpy arrays raise ValueError with plain `or`
+    make_name_list = mat.get("make_names")
+    if make_name_list is None:
+        make_name_list = mat.get("MN")
     if make_name_list is None:
         print("Warning: make_names not found in .mat file — using numeric IDs.")
+        print(f"         Available keys: {[k for k in mat if not k.startswith('_')]}")
         return {}
+
+    # Flatten in case scipy returned a nested ndarray
+    import numpy as np
+    if hasattr(make_name_list, "flatten"):
+        make_name_list = make_name_list.flatten()
 
     return {i + 1: str(name).strip() for i, name in enumerate(make_name_list)}
 
