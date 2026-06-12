@@ -2,8 +2,8 @@
 # Resume CelebA REPA from step 80k to 200k on GPUs 1,5,6,7.
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-/home/seankopylov/projects/repa_diffusion_celeba}"
-ACCELERATE="${ACCELERATE:-/home/seankopylov/.venv/bin/accelerate}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+ACCELERATE="${ACCELERATE:-accelerate}"
 
 cd "$REPO_ROOT/REPA"
 
