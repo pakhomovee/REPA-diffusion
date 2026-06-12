@@ -1,4 +1,4 @@
 [submodule "REPA"]
 	path = REPA
 	url = https://github.com/sekopylov/REPA.git
-	branch = main
+	branch = submission/repa-sigma
