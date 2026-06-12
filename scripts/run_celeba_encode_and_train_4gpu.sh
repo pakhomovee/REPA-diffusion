@@ -2,9 +2,9 @@
 # Encode CelebA VAE latents in parallel on GPUs 4,5,6,7, then start CelebA REPA training.
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-/home/seankopylov/projects/repa_diffusion_celeba}"
-PYTHON="${PYTHON:-/home/seankopylov/.venv/bin/python}"
-ACCELERATE="${ACCELERATE:-/home/seankopylov/.venv/bin/accelerate}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+PYTHON="${PYTHON:-python}"
+ACCELERATE="${ACCELERATE:-accelerate}"
 
 ENC_GPUS="${ENC_GPUS:-4,5,6,7}"
 ENC_BATCH="${ENC_BATCH:-128}"
@@ -40,7 +40,7 @@ import shutil
 import multiprocessing as mp
 from pathlib import Path
 
-ROOT = Path(os.environ.get("REPO_ROOT", "/home/seankopylov/projects/repa_diffusion_celeba"))
+ROOT = Path(os.environ.get("REPO_ROOT", os.getcwd()))
 SRC = ROOT / "data/celeba256"
 IMG_DIR = SRC / "images"
 DEST = SRC / "vae-sd"
